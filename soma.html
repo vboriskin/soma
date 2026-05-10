@@ -10822,9 +10822,31 @@ document.querySelectorAll('.modal-backdrop').forEach(m => {
 // iOS / mobile fixes — inject before anything else
 // Service worker — кеш app-shell + просмотренных картинок для офлайна.
 // Регистрируется только на http(s) — file:// браузер не разрешает SW.
+//
+// Дополнительно: на каждый старт страницы явно дёргаем `update()`, чтобы
+// браузер сразу проверил /sw.js и при изменённых байтах активировал
+// новый SW (благодаря skipWaiting + clients.claim). Без этого у юзера,
+// застрявшего на cache-first sw.js v1, обновления подъезжают только
+// после перезапуска браузера / 24 часов.
+//
+// Если активирован SW другой версии чем тот, что в register-промисе —
+// слушаем 'controllerchange' и тихо перезагружаем страницу один раз,
+// чтобы юзер сразу увидел свежую версию без дополнительных кликов.
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then((reg) => {
+      try { reg.update(); } catch (e) {}
+    }).catch(() => {});
+    // Авто-релоад при смене активного SW. Защита от петли через
+    // sessionStorage флаг — релоадим один раз за сессию.
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      if (sessionStorage.getItem('soma.swReloaded') === '1') return;
+      sessionStorage.setItem('soma.swReloaded', '1');
+      reloading = true;
+      location.reload();
+    });
   });
 }
 
