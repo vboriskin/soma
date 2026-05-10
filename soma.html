@@ -11814,8 +11814,11 @@ function applyMode(mode, opts = {}) {
   if (inp) {
     inp.placeholder = MODES[mode].placeholder;
     if (opts.resetQuery !== false) {
-      inp.value = MODES[mode].defaultQuery;
-      state.query = MODES[mode].defaultQuery;
+      // Пустой запрос — placeholder подскажет что ввести, а юзер сам
+      // решает: напечатать или кликнуть тег/раздел. Никаких дефолтных
+      // поисков «still life reference» с порога.
+      inp.value = '';
+      state.query = '';
     }
   }
 
@@ -11867,7 +11870,9 @@ function applyMode(mode, opts = {}) {
     state.todayDismissed = false;
     renderCard();
     historyLog('transition', { kind: 'mode', from: previous, to: mode });
-    search(state.query);
+    // Запускаем поиск только если запрос непустой. Иначе показываем
+    // idle-стейт (renderCard выше — empty-state с предложениями тегов).
+    if (state.query) search(state.query);
   }
   // Always update the today block visibility & content when applyMode runs
   if (mode === 'aesthetic' && state.view === 'stack') {
@@ -12678,8 +12683,11 @@ window.setRitualMode = function (mode) {
       loadBlocklist(),
       new Promise(resolve => setTimeout(resolve, 1500)),
     ]);
-    // Auto-start with default query so the app works immediately
-    search(state.query);
+    // Никаких автозапросов на старт — юзер видит чистое поле + placeholder,
+    // empty-state с предложенными тегами активного раздела. Поиск стартует
+    // только когда юзер сам что-то выбрал или ввёл.
+    if (state.query) search(state.query);
+    else renderCard();   // показать idle empty-state
   } catch(e) {
     document.getElementById('card-stack').innerHTML =
       `<div class="empty-state"><h3>Ошибка запуска</h3><p style="font-size: 12px; word-break: break-word;">${e.message}</p></div>`;
