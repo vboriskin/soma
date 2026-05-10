@@ -4460,6 +4460,24 @@ const CATEGORIES_BELL = {
     { label: 'athletic training', q: 'athletic training black white' },
     { label: 'after game', q: 'after the game photography' },
   ],
+  // Гачи-эстетика: гипер-маскулинная визуальная традиция, наследник Tom of
+  // Finland / Robert Mapplethorpe — мускулистые мужчины, борцовские позы,
+  // кожаные упряжи, татуировки, ranch-bear типажи. Запросы лежат в
+  // спорт-photography и subculture-fashion плоскости, без эксплицит-терминов.
+  'гачимучи': [
+    { label: 'billy herrington', q: 'billy herrington' },
+    { label: 'wrestling', q: 'pro wrestling photography' },
+    { label: 'muscle bear', q: 'muscle bear photography' },
+    { label: 'leather harness', q: 'leather harness portrait' },
+    { label: 'oiled bodybuilder', q: 'oiled bodybuilder photography' },
+    { label: 'tattooed muscle', q: 'tattooed muscular man portrait' },
+    { label: 'strongman vintage', q: 'vintage strongman photography' },
+    { label: 'powerlifter pose', q: 'powerlifter pose photography' },
+    { label: 'wrestler studio', q: 'wrestler studio portrait' },
+    { label: 'lumberjack bear', q: 'lumberjack bear photography' },
+    { label: 'gym daddy', q: 'gym muscle daddy photography' },
+    { label: 'beefcake monochrome', q: 'beefcake portrait monochrome' },
+  ],
   'queer и прайд': [
     { label: 'queer photography', q: 'queer photography' },
     { label: 'gay liberation', q: 'gay liberation 1970s' },
@@ -4479,6 +4497,10 @@ const QUERY_EXPANSIONS_BELL = [
   { re: /classical|antique|greek|roman/i,             mods: ['marble', 'torso', 'museum', 'statue', 'kouros', 'apollo'] },
   { re: /sebastian|martyr/i,                          mods: ['renaissance', 'painting', 'caravaggio', 'baroque', 'religious'] },
   { re: /cowboy|western|marlboro/i,                   mods: ['vintage', 'editorial', 'americana', 'desert', 'ralph lauren'] },
+  { re: /wrestl|herrington|wrestler/i,                mods: ['studio portrait', 'monochrome', 'leather', 'photography', 'vintage'] },
+  { re: /bear|lumberjack|daddy/i,                     mods: ['muscle', 'beard', 'photography', 'portrait', 'flannel'] },
+  { re: /harness|leather/i,                           mods: ['tom of finland', 'photography', 'portrait', 'studio', 'monochrome'] },
+  { re: /tattoo/i,                                    mods: ['muscle', 'monochrome', 'portrait', 'studio'] },
 ];
 const QUERY_EXPANSIONS_BELL_DEFAULT = ['vintage', 'photography', 'editorial', 'classical', 'monochrome'];
 
