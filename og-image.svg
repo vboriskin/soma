@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- OG-image для социальных шар — 1200x630, минимальная brand-композиция.
+     Twitter/Telegram/iMessage предпочитают PNG/JPG, но SVG тоже принимается
+     большинством. Если нужно — конвертировать в PNG через
+     `rsvg-convert og-image.svg > og-image.png` или браузерный screenshot. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#fafaf9"/>
+
+  <!-- Лого-рябь, увеличенная по центру -->
+  <g transform="translate(600 230)">
+    <g transform="scale(8) translate(-20 -11)">
+      <path d="M 6 8 Q 12 4, 18 8 T 32 8" fill="none" stroke="#1a1a1a" stroke-width="0.7" stroke-linecap="round"/>
+      <path d="M 6 14 Q 12 10, 18 14 T 32 14" fill="none" stroke="#1a1a1a" stroke-width="0.7" stroke-linecap="round" opacity="0.55"/>
+    </g>
+  </g>
+
+  <!-- Wordmark SOMA -->
+  <text x="600" y="380" text-anchor="middle"
+        font-family="Fraunces, Georgia, serif" font-style="italic" font-weight="300"
+        font-size="76" fill="#1a1a1a" letter-spacing="14">SOMA</text>
+
+  <!-- Tagline -->
+  <text x="600" y="440" text-anchor="middle"
+        font-family="Fraunces, Georgia, serif" font-style="italic" font-weight="300"
+        font-size="24" fill="#5a5a5a">слушать свой вкус, без шума</text>
+
+  <!-- Subtle bottom rule -->
+  <line x1="540" y1="500" x2="660" y2="500" stroke="#5a5a5a" stroke-width="0.5"/>
+</svg>

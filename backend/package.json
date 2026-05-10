@@ -1,0 +1,22 @@
+{
+  "name": "soma-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local proxy for SOMA — DeviantArt, ArtStation, Tumblr, Are.na",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exifr": "^7.1.3",
+    "express": "^4.19.2",
+    "playwright": "^1.59.1",
+    "ws": "^8.20.0"
+  }
+}

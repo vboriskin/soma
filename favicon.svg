@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SOMA favicon — две волны рябь, та же что в шапке.
+     prefers-color-scheme: dark → инверсия для тёмных вкладок. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 22">
+  <style>
+    path { stroke: #1a1a1a; }
+    @media (prefers-color-scheme: dark) {
+      path { stroke: #f5f4f0; }
+    }
+  </style>
+  <path d="M 6 8 Q 12 4, 18 8 T 32 8" fill="none" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M 6 14 Q 12 10, 18 14 T 32 14" fill="none" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>
+</svg>

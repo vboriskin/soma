@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180" aria-label="SOMA">
+  <path d="M 80 60 Q 120 30, 160 60 T 240 60" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M 80 95 Q 120 65, 160 95 T 240 95" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round" opacity="0.55"/>
+  <path d="M 80 130 Q 120 100, 160 130 T 240 130" fill="none" stroke="#1a1a1a" stroke-width="2.4" stroke-linecap="round" opacity="0.25"/>
+</svg>
