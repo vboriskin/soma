@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import routes from './routes.js';
+import stateRoutes from './routes-state.js';
 import dribbbleAuth from './auth/dribbble.js';
 import { closeBrowser } from './sources/_headless.js';
 import { shutdownFirehose } from './sources/_bluesky_firehose.js';
@@ -32,7 +33,7 @@ app.use(cors({
   },
   credentials: true,
   // Кастомный header для альфа-гейта (см. alphaKeyGate ниже).
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Alpha-Key'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Alpha-Key', 'X-Client-Id'],
 }));
 app.use(express.json());
 
@@ -67,6 +68,10 @@ app.get('/', (_req, res) => {
   res.type('text/plain').send('soma backend — ok');
 });
 
+// State-эндпоинты (history + snapshots) на /api/state — монтируем ДО
+// общего /api → routes, чтобы Express по prefix-match сначала проверил
+// более специфичный путь.
+app.use('/api/state', alphaKeyGate, stateRoutes);
 app.use('/api', alphaKeyGate, routes);
 app.use('/auth', alphaKeyGate, dribbbleAuth);
 

@@ -3313,6 +3313,30 @@ const BACKEND_URL = (() => {
 const ALPHA_KEY_LS = 'soma.alphaKey';
 function getAlphaKey()      { try { return localStorage.getItem(ALPHA_KEY_LS) || ''; } catch { return ''; } }
 function setAlphaKey(v)     { try { v ? localStorage.setItem(ALPHA_KEY_LS, v) : localStorage.removeItem(ALPHA_KEY_LS); } catch {} }
+
+// ============== Client-ID (partition key for per-device backend state) ==============
+// Аккаунтов ещё нет, но нужно изолировать history/blocklist между юзерами
+// одной альфы. Генерим стабильный ID при первом заходе и кладём в LS.
+// Сервер хранит файлы в /data/clients/<id>/. Когда введём настоящий
+// auth — clientId превратится в userId, остальное не меняется.
+const CLIENT_ID_LS = 'soma.clientId';
+function getClientId() {
+  try {
+    let id = localStorage.getItem(CLIENT_ID_LS);
+    if (id && /^[a-zA-Z0-9_-]{16,64}$/.test(id)) return id;
+    // crypto.randomUUID на современных браузерах; фолбэк — 32 hex.
+    if (window.crypto?.randomUUID) {
+      id = window.crypto.randomUUID().replace(/-/g, '');
+    } else {
+      const bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      id = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    }
+    localStorage.setItem(CLIENT_ID_LS, id);
+    return id;
+  } catch (e) { return null; }
+}
+const CLIENT_ID = getClientId();
 // Прод = HTTPS на не-localhost. Совпадает с тем, когда бэк включает
 // alphaKeyGate (через env ALPHA_KEY).
 function isProdBackend() {
@@ -3388,16 +3412,22 @@ function showAlphaKeyBlocker(opts = {}) {
   window.fetch = async function(input, init) {
     const url = typeof input === 'string' ? input : (input?.url || '');
     const isOurBackend = isBackendUrl(url);
-    if (isOurBackend && isProdBackend()) {
-      const key = getAlphaKey();
-      if (!key) {
-        // Сеть не дёргаем — это спам 401 на N источников. Сразу синтетика.
-        showAlphaKeyBlocker();
-        return NO_KEY_RESPONSE();
-      }
+    if (isOurBackend) {
+      // X-Client-Id шлём всегда (даже на локалке): /api/state/* проверяет
+      // его независимо от alpha-key. На локалке alpha-key gate выключен,
+      // но clientId всё равно нужен для партиционирования файлов.
       init = init || {};
       init.headers = new Headers(init.headers || {});
-      init.headers.set('X-Alpha-Key', key);
+      if (CLIENT_ID) init.headers.set('X-Client-Id', CLIENT_ID);
+      if (isProdBackend()) {
+        const key = getAlphaKey();
+        if (!key) {
+          // Сеть не дёргаем — это спам 401 на N источников. Сразу синтетика.
+          showAlphaKeyBlocker();
+          return NO_KEY_RESPONSE();
+        }
+        init.headers.set('X-Alpha-Key', key);
+      }
     }
     const res = await origFetch(input, init);
     if (isOurBackend && res.status === 401 && isProdBackend()) {
@@ -5088,14 +5118,102 @@ function diagRecord(sourceId, info) {
 }
 
 const HISTORY_LIMIT = 500;
+function _makeEventId() {
+  // crypto.randomUUID — самый чистый, фолбэк для старых браузеров.
+  try {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    const a = new Uint8Array(8);
+    window.crypto.getRandomValues(a);
+    return Date.now().toString(36) + '-' + Array.from(a, b => b.toString(16).padStart(2,'0')).join('');
+  } catch { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10); }
+}
 function historyLog(type, payload) {
   if (!type) return;
-  state.history.events.push({ ts: Date.now(), type, payload: payload || null });
+  const ev = { id: _makeEventId(), ts: Date.now(), type, payload: payload || null };
+  state.history.events.push(ev);
   if (state.history.events.length > HISTORY_LIMIT) {
     state.history.events.splice(0, state.history.events.length - HISTORY_LIMIT);
   }
+  // Зеркалим на бэк (fire-and-forget — сетевая ошибка не должна ломать UX,
+  // у нас всё равно есть локальная копия).
+  pushHistoryEventToBackend(ev);
   const modal = document.getElementById('hist-modal');
   if (modal && modal.classList.contains('show')) renderHistory();
+}
+
+// ============== BACKEND STATE SYNC ==============
+// Pull при init (history + catBlocklist), push на каждый mutation.
+// Источник правды — бэк; локальный storage — кеш для быстрого старта и
+// офлайна. На каждую запись отправляем fire-and-forget POST.
+
+async function pushHistoryEventToBackend(ev) {
+  if (!CLIENT_ID || !ev) return;
+  try {
+    await fetch(`${BACKEND_URL}/api/state/history`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ev),
+    });
+  } catch (e) { /* offline / 401 — копия осталась в LS, перешлёшь позже */ }
+}
+
+async function pullHistoryFromBackend() {
+  if (!CLIENT_ID) return;
+  try {
+    // Берём всё что у бэкa новее самого свежего локального события.
+    // Локальная история ограничена HISTORY_LIMIT, бэкенд хранит больше —
+    // на init берём top-N (1000), мерджим по id.
+    const r = await fetch(`${BACKEND_URL}/api/state/history?limit=1000`);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!Array.isArray(data.events)) return;
+    const localById = new Set(state.history.events.map(e => e.id).filter(Boolean));
+    const localByTs = new Set(state.history.events.map(e => `${e.ts}|${e.type}`));
+    for (const ev of data.events) {
+      // ID-based dedup (новые события) + ts-based dedup (старые без id)
+      if (ev.id && localById.has(ev.id)) continue;
+      if (localByTs.has(`${ev.ts}|${ev.type}`)) continue;
+      state.history.events.push(ev);
+    }
+    state.history.events.sort((a, b) => a.ts - b.ts);
+    if (state.history.events.length > HISTORY_LIMIT) {
+      state.history.events.splice(0, state.history.events.length - HISTORY_LIMIT);
+    }
+    // Если открыта модалка истории — перерисуем
+    const modal = document.getElementById('hist-modal');
+    if (modal && modal.classList.contains('show')) renderHistory();
+  } catch (e) { /* offline */ }
+}
+
+async function pushCatBlocklistToBackend() {
+  if (!CLIENT_ID) return;
+  try {
+    await fetch(`${BACKEND_URL}/api/state/snapshot/catBlocklist`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: state.categoryBlocklist || {} }),
+    });
+  } catch (e) {}
+}
+
+async function pullCatBlocklistFromBackend() {
+  if (!CLIENT_ID) return;
+  try {
+    const r = await fetch(`${BACKEND_URL}/api/state/snapshot/catBlocklist`);
+    if (!r.ok) return;
+    const data = await r.json();
+    if (!data.data || typeof data.data !== 'object') {
+      // Бэк пуст — заpush'им то что у нас в LS (one-time bootstrap для
+      // существующих юзеров).
+      if (state.categoryBlocklist && Object.keys(state.categoryBlocklist).length) {
+        pushCatBlocklistToBackend();
+      }
+      return;
+    }
+    state.categoryBlocklist = data.data;
+    // Зеркалим в LS — для быстрого старта на следующих заходах.
+    try { localStorage.setItem('rs:catBlocklist', JSON.stringify(state.categoryBlocklist)); } catch {}
+  } catch (e) {}
 }
 
 // ============== STORAGE (localStorage with in-memory fallback) ==============
@@ -6369,6 +6487,8 @@ function loadCategoryBlocklist() {
 }
 function saveCategoryBlocklist() {
   try { localStorage.setItem('rs:catBlocklist', JSON.stringify(state.categoryBlocklist || {})); } catch (e) {}
+  // Зеркалим на бэк — fire-and-forget, источник правды теперь сервер.
+  if (typeof pushCatBlocklistToBackend === 'function') pushCatBlocklistToBackend();
 }
 function categoryHideAdd(category, type, value) {
   if (!category) return false;
@@ -11576,9 +11696,14 @@ function renderHistory() {
 }
 
 function clearHistory() {
-  if (!confirm(`Очистить историю (${state.history.events.length} событий)?`)) return;
+  if (!confirm(`Очистить историю (${state.history.events.length} событий)? Это удалит её и на сервере — без отмены.`)) return;
   state.history.startedAt = Date.now();
   state.history.events = [];
+  // На бэке тоже стираем (если есть clientId) — иначе при следующем
+  // pull всё вернётся.
+  if (CLIENT_ID) {
+    fetch(`${BACKEND_URL}/api/state/history`, { method: 'DELETE' }).catch(() => {});
+  }
   renderHistory();
 }
 
@@ -13124,8 +13249,12 @@ window.setRitualMode = function (mode) {
     // авторов в первой стопке. Cap 1500ms через Promise.race чтобы init не
     // зависал если backend упал.
     await Promise.race([
-      loadBlocklist(),
-      new Promise(resolve => setTimeout(resolve, 1500)),
+      Promise.all([
+        loadBlocklist(),
+        pullCatBlocklistFromBackend(),
+        pullHistoryFromBackend(),
+      ]),
+      new Promise(resolve => setTimeout(resolve, 2500)),
     ]);
     // Никаких автозапросов на старт — юзер видит чистое поле + placeholder,
     // empty-state с предложенными тегами активного раздела. Поиск стартует
