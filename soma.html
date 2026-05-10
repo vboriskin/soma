@@ -5097,7 +5097,10 @@ function onPresetChange() {
       state.feedItemsBySource = {};
       if (typeof loadFeed === 'function') loadFeed();
     } else if (typeof search === 'function') {
-      search(state.query);
+      // Не дёргаем поиск при пустом query — иначе после смены раздела
+      // без введённого запроса полетят «missing q» на 5+ источников.
+      if (state.query) search(state.query);
+      else if (typeof renderCard === 'function') renderCard();
     }
   }, 200);
 }
@@ -7860,6 +7863,18 @@ function updateLikedBadge() {
 
 // ============== SEARCH ==============
 async function search(query, append = false) {
+  // Пустой запрос — НЕ дёргаем бэкенд (5 источников вернут «missing q»),
+  // НЕ пишем в history. Просто очищаем стек и показываем idle empty-state.
+  // Это срабатывает после mode-switch + клика по категории (см. п.4).
+  if (!append && !String(query || '').trim()) {
+    state.query = '';
+    state.queue = [];
+    state.loading = false;
+    renderCard();
+    renderExpansion();
+    if (typeof renderPresets === 'function') renderPresets();
+    return;
+  }
   state.query = query;
   if (!append) {
     state.loading = true;
