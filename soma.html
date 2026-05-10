@@ -9871,7 +9871,57 @@ async function renderPaywallCookies() {
   });
 }
 
-// Settings
+// Settings — маскировка API-ключей (если уже заполнены).
+// HTML декларирует input как `type="text"`. Когда юзер открывает settings
+// и в state есть ключ — переключаем тип на `password` и навешиваем
+// текстовую ссылку «показать»/«скрыть». Свежий ввод (пустое поле) — не
+// трогаем, чтобы юзер видел что вставляет.
+function applySecretMasking(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const field = el.closest('.field') || el.parentElement;
+  if (!field) return;
+  // Идемпотентность — если уже навешано, не дублируем.
+  let toggle = field.querySelector('.secret-toggle');
+  if (!toggle) {
+    toggle = document.createElement('span');
+    toggle.className = 'text-link secret-toggle';
+    toggle.style.cssText = 'font-size: 11px; margin-left: 8px; vertical-align: middle;';
+    toggle.addEventListener('click', () => {
+      const showing = el.type === 'text';
+      el.type = showing ? 'password' : 'text';
+      toggle.textContent = showing ? 'показать' : 'скрыть';
+    });
+    // Кладём рядом с label
+    const label = field.querySelector('label');
+    if (label) label.appendChild(toggle);
+    else field.insertBefore(toggle, el);
+  }
+  // Состояние по умолчанию — спрятано если значение есть.
+  if (el.value) {
+    el.type = 'password';
+    toggle.textContent = 'показать';
+    toggle.style.display = '';
+  } else {
+    el.type = 'text';
+    toggle.style.display = 'none';
+  }
+  // При первом фокусе на пустом поле не показываем toggle до ввода — но
+  // как только что-то напечатали и блюр случился — маскируем + показываем
+  // toggle. Это даёт нативную UX: «пока пусто — open, как сохранил —
+  // спрятано».
+  if (!el.dataset.secretBound) {
+    el.dataset.secretBound = '1';
+    el.addEventListener('blur', () => {
+      if (el.value) {
+        el.type = 'password';
+        toggle.textContent = 'показать';
+        toggle.style.display = '';
+      }
+    });
+  }
+}
+
 bind('settings-btn', () => {
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   set('key-unsplash', state.keys.unsplash || '');
@@ -9879,6 +9929,7 @@ bind('settings-btn', () => {
   set('key-pixabay', state.keys.pixabay || '');
   set('key-flickr', state.keys.flickr || '');
   set('key-smithsonian', state.keys.smithsonian || '');
+  ['key-unsplash', 'key-pexels', 'key-pixabay', 'key-flickr', 'key-smithsonian'].forEach(applySecretMasking);
   renderSubsList();
   renderPaywallCookies();
   loadTelegramInfo().then(() => renderTelegramSection());
@@ -10144,6 +10195,7 @@ bind('settings-clear', () => {
   ['key-unsplash','key-pexels','key-pixabay','key-flickr','key-smithsonian'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
+    applySecretMasking(id);   // скрывает toggle и возвращает type=text
   });
   renderSources();
   // Undo-toast — даём 8 сек чтобы вернуть.
@@ -10161,6 +10213,7 @@ bind('settings-clear', () => {
     Object.entries(backup).forEach(([k, v]) => {
       const el = document.getElementById('key-' + k);
       if (el) el.value = v;
+      applySecretMasking('key-' + k);   // снова маскируем восстановленные
     });
     renderSources();
     t.remove();
