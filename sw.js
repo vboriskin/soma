@@ -10,8 +10,8 @@
 // Bump SHELL_CACHE version при изменении этой стратегии — это форсит
 // activate handler удалить старый кеш у всех юзеров.
 
-const SHELL_CACHE = 'soma-shell-v2';
-const IMG_CACHE   = 'soma-img-v1';
+const SHELL_CACHE = 'soma-shell-v3';
+const IMG_CACHE   = 'soma-img-v2';
 const SHELL = [
   './favicon.svg',
   './app-icon-512.svg',
@@ -90,19 +90,31 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. CDN images — stale-while-revalidate (limit to image destination)
+  // 2. CDN images — stale-while-revalidate (limit to image destination).
+  // Аккуратно с CORS: некоторые источники (preview.redd.it) не отдают
+  // CORS-заголовки → fetch выпадает в сетевую ошибку, cache.put на
+  // отсутствующем Response бросает TypeError. Поэтому защищаем каждый
+  // шаг try/catch'ом и фолбэчимся на «пустой» 504 если совсем нечего отдать.
   if (req.destination === 'image') {
-    event.respondWith(
-      caches.open(IMG_CACHE).then((cache) =>
-        cache.match(req).then((cached) => {
-          const network = fetch(req).then((resp) => {
-            if (resp && resp.ok) cache.put(req, resp.clone()).catch(() => {});
-            return resp;
-          }).catch(() => cached);
-          return cached || network;
-        })
-      )
-    );
+    event.respondWith((async () => {
+      try {
+        const cache = await caches.open(IMG_CACHE);
+        const cached = await cache.match(req);
+        // Stale-while-revalidate: показываем кеш сразу, в фоне обновляем
+        // (только если в фоне успешный ok-response).
+        const networkPromise = fetch(req).then((resp) => {
+          if (resp && resp.ok && resp.type !== 'opaque') {
+            cache.put(req, resp.clone()).catch(() => {});
+          }
+          return resp;
+        }).catch(() => null);
+        if (cached) return cached;
+        const fresh = await networkPromise;
+        if (fresh) return fresh;
+      } catch (e) { /* drop to fallback */ }
+      // Совсем плохо — пустой 504 чтобы браузер не падал в Uncaught TypeError
+      return new Response('', { status: 504, statusText: 'sw-image-failed' });
+    })());
     return;
   }
 
