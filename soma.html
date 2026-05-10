@@ -950,6 +950,7 @@
     border-bottom: 0.5px solid transparent;
   }
   .preset:hover { color: var(--ink); border-bottom-color: var(--ink); }
+  .preset.active { color: var(--ink); border-bottom-color: var(--ink); }
 
   .expansion-row {
     display: flex;
@@ -7587,6 +7588,10 @@ async function search(query, append = false) {
     state.queue = [];
     renderCard();
     renderExpansion();
+    // Подсветка активного тега в #preset-row синхронизируется с
+    // текущим query — кликнул чип, ввёл руками или сменил тег, всё
+    // одинаково обновляется.
+    if (typeof renderPresets === 'function') renderPresets();
     historyLog('search', { query });
     // Quality metrics: общий счётчик + отдельный для cyrillic-запросов
     // (cyrillic-empty rate — ключевая метрика multilingual-проблемы).
@@ -8728,13 +8733,29 @@ function renderPresets() {
   lab.className = 'row-label';
   lab.textContent = 'тег ·';
   row.appendChild(lab);
+  const curQ = String(state.query || '').trim();
   items.forEach(item => {
     const el = document.createElement('span');
-    el.className = 'preset';
+    const isActive = item.q === curQ;
+    el.className = 'preset' + (isActive ? ' active' : '');
     el.textContent = item.label;
     el.onclick = () => {
-      document.getElementById('query').value = item.q;
-      search(item.q);
+      const inp = document.getElementById('query');
+      if (isActive) {
+        // Повторный клик по активному тегу — снимаем (toggle off).
+        // Очищаем поле и стек, никакого нового поиска не дёргаем.
+        if (inp) inp.value = '';
+        state.query = '';
+        state.queue = [];
+        renderPresets();
+        renderCard();
+        renderExpansion();
+      } else {
+        if (inp) inp.value = item.q;
+        search(item.q);
+        // Подсветим этот тег сразу — пока search не дёрнул re-render.
+        renderPresets();
+      }
     };
     row.appendChild(el);
   });
