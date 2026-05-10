@@ -2349,23 +2349,23 @@
 
 <!-- Sync-init ambient до первого paint, чтобы не было вспышки чужого стиля.
      Читаем localStorage и проставляем data-ambient на <body> ДО того как
-     браузер встретит <aside> ниже. Дефолт — 'strokes' (sumi-e графит).
+     браузер встретит <aside> ниже. Дефолт — 'dust' (мягкие тёплые пятна).
      Валидные значения: off | strokes | bokeh | dust. -->
 <script>
   (function () {
     try {
       var v = localStorage.getItem('rs:ambient');
-      if (!v || !/^(off|strokes|bokeh|dust)$/.test(v)) v = 'strokes';
+      if (!v || !/^(off|strokes|bokeh|dust)$/.test(v)) v = 'dust';
       document.body.setAttribute('data-ambient', v);
     } catch (e) {
-      document.body.setAttribute('data-ambient', 'strokes');
+      document.body.setAttribute('data-ambient', 'dust');
     }
     try {
       var l = localStorage.getItem('rs:layout');
-      if (l !== 'side' && l !== 'below') l = 'below';
+      if (l !== 'side' && l !== 'below') l = 'side';
       document.body.setAttribute('data-layout', l);
     } catch (e) {
-      document.body.setAttribute('data-layout', 'below');
+      document.body.setAttribute('data-layout', 'side');
     }
     try {
       var mu = localStorage.getItem('rs:modeui');
@@ -12316,8 +12316,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const cur = (function () {
       try {
         const v = localStorage.getItem('rs:layout');
-        return (v === 'side' || v === 'below') ? v : 'below';
-      } catch (e) { return 'below'; }
+        return (v === 'side' || v === 'below') ? v : 'side';
+      } catch (e) { return 'side'; }
     })();
     document.querySelectorAll('#layout-modes [data-layout-mode]').forEach(b => {
       b.classList.toggle('active', b.getAttribute('data-layout-mode') === cur);
@@ -12561,7 +12561,7 @@ window.setRitualMode = function (mode) {
 
   // Публичный API — вызывается из настроек при клике на текст-линк.
   function setAmbient(mode) {
-    if (!VALID_MODES.includes(mode)) mode = 'strokes';
+    if (!VALID_MODES.includes(mode)) mode = 'dust';
     document.body.setAttribute('data-ambient', mode);
     try { localStorage.setItem('rs:ambient', mode); } catch (e) {}
     // Подсветка активной кнопки в настройках.
@@ -12572,7 +12572,7 @@ window.setRitualMode = function (mode) {
   // Экспортим для настроек (settings UI вешает onclick на text-link'и).
   window.setAmbient = setAmbient;
   window.refreshAmbientUI = function () {
-    const mode = document.body.getAttribute('data-ambient') || 'strokes';
+    const mode = document.body.getAttribute('data-ambient') || 'dust';
     document.querySelectorAll('#ambient-modes [data-ambient-mode]').forEach(b => {
       b.classList.toggle('active', b.getAttribute('data-ambient-mode') === mode);
     });
@@ -12587,7 +12587,7 @@ window.setRitualMode = function (mode) {
   // Если data-ambient ещё не выставлен (на случай если sync-init выше упал),
   // ставим дефолт.
   if (!document.body.getAttribute('data-ambient')) {
-    setAmbient('strokes');
+    setAmbient('dust');
   }
 
   // Settings UI — вешаем клики на 4 text-link'а. Делаем после DOMContentLoaded
