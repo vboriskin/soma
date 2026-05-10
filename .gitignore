@@ -28,6 +28,7 @@ backend/db/*.sqlite
 # Build artifacts
 dist/
 build/
+deploy/dist/
 
 # Logs
 *.log

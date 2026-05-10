@@ -3240,7 +3240,69 @@ function formatMMSS(seconds) {
 }
 
 // ============== STATE ==============
-const BACKEND_URL = 'http://localhost:8787';
+// Backend URL — для прода прописываем prod-домен, для localhost / file:// /
+// preview-доменов Cloudflare Pages используем `localhost:8787`. Можно
+// переопределить вручную через `?backend=...` query-param (полезно для
+// тестов на staging-инстансе).
+const BACKEND_URL = (() => {
+  const fromQuery = new URLSearchParams(location.search).get('backend');
+  if (fromQuery) return fromQuery.replace(/\/$/, '');
+  const host = location.hostname;
+  // Локальная разработка — всё что не https-домен.
+  if (!host || host === 'localhost' || host === '127.0.0.1' || location.protocol === 'file:') {
+    return 'http://localhost:8787';
+  }
+  // Production — живой бэкенд. Меняй на свой prod-URL после деплоя на Fly.
+  // Cloudflare Pages preview-деплои (*.pages.dev) тоже идут сюда.
+  return 'https://soma-backend.fly.dev';
+})();
+
+// ============== Alpha-key gate (закрытая альфа) ==============
+// На проде бэкенд требует header `X-Alpha-Key`. Юзер вводит ключ один раз
+// (мы его получаем при инвайте), он сохраняется в localStorage и шлётся
+// автоматом на каждый fetch к BACKEND_URL.
+//
+// На localhost (бэк без env ALPHA_KEY) гейт выключен — ничего не просим.
+// Если ключ неверен — бэк отдаёт 401 → перепрашиваем.
+const ALPHA_KEY_LS = 'soma.alphaKey';
+function getAlphaKey()      { try { return localStorage.getItem(ALPHA_KEY_LS) || ''; } catch { return ''; } }
+function setAlphaKey(v)     { try { v ? localStorage.setItem(ALPHA_KEY_LS, v) : localStorage.removeItem(ALPHA_KEY_LS); } catch {} }
+function isProdBackend()    { return /^https:/.test(BACKEND_URL); }
+
+async function ensureAlphaKey() {
+  if (!isProdBackend()) return true;
+  if (getAlphaKey()) return true;
+  // Простейший prompt — нормальный модал сделаем после Этапа 1 (аккаунты).
+  const k = window.prompt('SOMA — приватная альфа.\nВведите инвайт-ключ:');
+  if (!k) return false;
+  setAlphaKey(k.trim());
+  return true;
+}
+
+// Перехватчик fetch — автоматом добавляет X-Alpha-Key к запросам на бэк.
+// Если бэк отвечает 401 — чистим ключ и просим заново.
+(function patchFetchForAlphaGate() {
+  const origFetch = window.fetch.bind(window);
+  window.fetch = async function(input, init) {
+    const url = typeof input === 'string' ? input : (input?.url || '');
+    const isOurBackend = url.startsWith(BACKEND_URL);
+    if (isOurBackend && isProdBackend()) {
+      const key = getAlphaKey();
+      if (key) {
+        init = init || {};
+        init.headers = new Headers(init.headers || {});
+        init.headers.set('X-Alpha-Key', key);
+      }
+    }
+    const res = await origFetch(input, init);
+    if (isOurBackend && res.status === 401 && isProdBackend()) {
+      setAlphaKey('');
+      // Не зацикливаемся на одном запросе — перепросим на следующем.
+      console.warn('[alpha-gate] 401 — ключ сброшен, запросим заново');
+    }
+    return res;
+  };
+})();
 
 // Each source can declare which mode(s) it's relevant for. Default: both.
 const SOURCES = [
@@ -12482,6 +12544,12 @@ window.setRitualMode = function (mode) {
 
 (async function init() {
   try {
+    // На проде требуется альфа-ключ ДО любых fetch'ев (иначе будем словить
+    // 401 на blocklist/info/feed-sources). На локалке — no-op.
+    const ok = await ensureAlphaKey();
+    if (!ok) {
+      console.warn('[alpha-gate] ключ не введён — UI запустится, но запросы будут падать 401');
+    }
     loadState();
     setupModeToggle();
     setupDribbbleSection();

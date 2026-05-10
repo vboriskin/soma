@@ -1,0 +1,12 @@
+node_modules
+.env
+.env.local
+*.log
+cache/
+*.sqlite
+*.sqlite-journal
+dribbble-cookies.txt
+dribbble-status.json
+telegram-targets.json
+blocklist.json
+.DS_Store
