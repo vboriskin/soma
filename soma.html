@@ -6339,7 +6339,8 @@ async function blocklistAdd(type, value) {
     });
     if (!r.ok) throw new Error(`blocklist add ${r.status}`);
     await loadBlocklist();
-    historyLog('block', { type, value });
+    // NB: историю сюда НЕ пишем — executeHide уже логирует 'hide' с
+    // полным контекстом. Чтобы не было дублей.
     return true;
   } catch (e) { console.warn('[blocklist add]', e.message); return false; }
 }
@@ -6387,7 +6388,8 @@ function categoryHideAdd(category, type, value) {
     return false;
   }
   saveCategoryBlocklist();
-  historyLog('hide-category', { category, type, value });
+  // NB: историю сюда НЕ пишем — executeHide логирует 'hide' c полным
+  // контекстом (mode, category, tag, query, reason, …).
   return true;
 }
 function categoryHideRemove(category, type, value) {
@@ -11436,15 +11438,29 @@ const HIST_TYPE_LABEL = {
   open: 'открытие',
   error: 'ошибка',
   session_start: 'старт сессии',
+  hide: 'скрытие',
 };
 const HIST_FILTERS = [
   { id: 'all', label: 'все', match: () => true },
   { id: 'search', label: 'поиски', match: ev => ev.type === 'search' },
   { id: 'save', label: 'сохранения', match: ev => ev.type === 'save' },
+  // Скрытия: новый событие 'hide' (с reason + контекстом) + старые
+  // 'block'/'hide-category' для обратной совместимости с уже записанной
+  // историей.
+  { id: 'hide', label: 'скрытия', match: ev => ev.type === 'hide' || ev.type === 'block' || ev.type === 'hide-category' },
   { id: 'telegram_send', label: 'отправки', match: ev => ev.type === 'telegram_send' },
   { id: 'error', label: 'ошибки', match: ev => ev.type === 'error' },
 ];
 let histFilterId = 'all';
+
+// Reason → читабельная метка для UI и экспорта. null = «пропустить».
+const HIDE_REASON_DISPLAY = {
+  quality:    'плохое качество',
+  irrelevant: 'нерелевантно',
+  dislike:    'не нравится',
+  'off-topic': 'вне темы',
+  duplicate:  'повтор',
+};
 
 function fmtHistTime(ts) {
   const d = new Date(ts);
@@ -11470,6 +11486,39 @@ function histDetail(ev) {
       const cnt = p.itemCount || 1;
       const okMark = p.success ? '' : ' · сбой';
       return `→ ${p.targetLabel || p.targetId || '?'} · ${cnt} картин${cnt === 1 ? 'ка' : (cnt < 5 ? 'ки' : 'ок')}${okMark}${p.error ? ' (' + p.error + ')' : ''}`;
+    }
+    case 'hide':
+    case 'hide-category':
+    case 'block': {
+      // Что именно скрыто
+      const typeMap = { image: 'картинка', author: 'автор', source: 'источник' };
+      const what = typeMap[p.type] || p.type || '?';
+      let valueStr = '';
+      if (p.type === 'author') {
+        const a = p.value || {};
+        valueStr = `${a.name || p.author || '?'}${a.source ? ' · ' + a.source : ''}`;
+      } else if (p.type === 'source') {
+        valueStr = String(p.value || p.source || '?');
+      } else if (p.type === 'image') {
+        const url = String(p.value || '');
+        try { valueStr = new URL(url).hostname + new URL(url).pathname.slice(0, 28); } catch { valueStr = url.slice(0, 48); }
+      }
+      const reasonStr = p.reason
+        ? ` · причина: ${HIDE_REASON_DISPLAY[p.reason] || p.reasonLabel || p.reason}`
+        : (p.reason === null && p.type ? ' · без причины' : '');
+      // Контекст: режим + раздел + (тег если есть) + запрос
+      const ctxBits = [];
+      if (p.mode) ctxBits.push(`режим: ${p.mode === 'artist' ? 'художник' : (p.mode === 'designer' ? 'дизайнер' : 'эстетика')}`);
+      if (p.category) ctxBits.push(`раздел: ${p.category}`);
+      if (p.tag) ctxBits.push(`тег: ${p.tag}`);
+      if (p.preset) ctxBits.push(`пресет: ${p.preset}`);
+      if (p.query) ctxBits.push(`запрос: ${p.query}`);
+      if (p.platform && p.platform !== 'all') ctxBits.push(`платформа: ${p.platform}`);
+      if (p.domain   && p.domain   !== 'all') ctxBits.push(`тип: ${p.domain}`);
+      if (p.theme    && p.theme    !== 'all') ctxBits.push(`тема: ${p.theme}`);
+      if (p.artistLevel && p.artistLevel !== 'all') ctxBits.push(`уровень: ${p.artistLevel}`);
+      const ctx = ctxBits.length ? ` · ${ctxBits.join(' · ')}` : '';
+      return `${what}: ${valueStr}${reasonStr}${ctx}`;
     }
     default: return JSON.stringify(p || {});
   }
