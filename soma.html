@@ -4504,19 +4504,32 @@ const QUERY_EXPANSIONS_BELL = [
 ];
 const QUERY_EXPANSIONS_BELL_DEFAULT = ['vintage', 'photography', 'editorial', 'classical', 'monochrome'];
 
-// Дефолтный whitelist источников для bell-режима. Без музеев (met /
-// wikiart / wikimedia / iarchive / artvee / europeana), без reddit
-// (без курированных сабов он непредсказуем). Pinterest / wallhaven
-// остаются с включёнными SFW-фильтрами на их стороне.
+// Дефолтный whitelist источников для bell-режима.
+// Музеи возвращены: именно у них концентрированная мужская эстетика
+// (греческие торсы, Караваджо, Mapplethorpe, vintage physique magazines).
+// SFW-сорсы вроде unsplash/pexels на эту тему отдают мусор — без музеев
+// режим почти пустой.
+// Reddit не включаем — без курированных сабов непредсказуем (см. план).
 const BELL_ENABLED_SOURCES = new Set([
-  'tumblr',
-  'flickr',
+  // Музейное ядро — самый плотный сигнал для классики и архивов
+  'met',
+  'wikiart',
+  'wikimedia',
+  'iarchive',
+  'artvee',
+  'europeana',
+  'smithsonian',
   'nypl',
+  // Платформы художников и фото
   'artstation',
   'deviantart',
+  'tumblr',
+  'flickr',
   'arena', 'arena-tags',
-  'wallhaven',
+  // Современная фото (SFW, но иногда дают релевант на editorial-запросы)
   'unsplash', 'pexels', 'pixabay',
+  'wallhaven',
+  // Скрейп-источники (рискованные, но могут давать живые подборки)
   'pinterest',
   'bluesky-firehose',
   'opensea',
@@ -5460,13 +5473,25 @@ function loadState() {
     const old = storageGet('rs:enabled');
     if (old) legacyEnabled = JSON.parse(old);
   } catch(e) {}
-  for (const m of ['artist','designer','aesthetic']) {
+  for (const m of ['artist','designer','aesthetic','bell']) {
     try {
       const r = storageGet('rs:enabled:' + m);
       if (r) state.enabledSourcesByMode[m] = JSON.parse(r);
-      else if (legacyEnabled) state.enabledSourcesByMode[m] = { ...legacyEnabled };
+      // legacyEnabled — миграция со старой однорежимной модели; для bell
+      // не применима, иначе обычные SFW-источники попадут не туда.
+      else if (legacyEnabled && m !== 'bell') state.enabledSourcesByMode[m] = { ...legacyEnabled };
     } catch(e) {}
   }
+  // Bell migration v2 (2026-05-11): добавили музеи в дефолтный whitelist.
+  // У существующих пользователей в LS лежит старая карта без них — сбрасываем
+  // bell-конфиг один раз, чтобы applyMode перебилл’ил по новому whitelist.
+  try {
+    if (!localStorage.getItem('rs:bellMigrationV2')) {
+      state.enabledSourcesByMode.bell = {};
+      try { localStorage.removeItem('rs:enabled:bell'); } catch(e) {}
+      localStorage.setItem('rs:bellMigrationV2', '1');
+    }
+  } catch (e) {}
   if (legacyEnabled) {
     try { localStorage.removeItem('rs:enabled'); } catch(e) {}
   }
@@ -5474,10 +5499,11 @@ function loadState() {
     const r = storageGet('rs:liked');
     if (r) state.liked = JSON.parse(r);
   } catch(e) {}
-  // Mode (default artist)
+  // Mode (default artist). bell — отдельный gate: capability проверяется
+  // в applyMode и фолбэчит на aesthetic если нет BELL_KEY.
   try {
     const r = storageGet('rs:mode');
-    if (r === 'artist' || r === 'designer' || r === 'aesthetic') state.mode = r;
+    if (r === 'artist' || r === 'designer' || r === 'aesthetic' || r === 'bell') state.mode = r;
   } catch(e) {}
 
   // Per-mode subreddits, with one-time migration of old single-list `rs:subs`.
@@ -5656,9 +5682,9 @@ function loadState() {
 
 function saveKeys()     { try { storageSet('rs:keys', JSON.stringify(state.keys)); } catch(e) {} }
 function saveEnabled() {
-  // Mirror current mode's flags back into per-mode store, then persist all three.
+  // Mirror current mode's flags back into per-mode store, then persist all modes.
   state.enabledSourcesByMode[state.mode] = state.enabledSources;
-  for (const m of ['artist','designer','aesthetic']) {
+  for (const m of ['artist','designer','aesthetic','bell']) {
     try { storageSet('rs:enabled:' + m, JSON.stringify(state.enabledSourcesByMode[m] || {})); } catch(e) {}
   }
 }
