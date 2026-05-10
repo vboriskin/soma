@@ -2944,9 +2944,18 @@
       <button class="text-link" id="session-close" aria-label="Закрыть">закрыть</button>
     </div>
     <div class="modal-body">
-      <div class="field">
+      <div class="field" id="session-duration-field">
         <label>длительность</label>
         <div class="opt-row" id="session-duration"></div>
+      </div>
+      <div class="field" id="session-manual-field" hidden>
+        <label>вручную</label>
+        <div class="opt-row" style="gap: 12px; align-items: baseline;">
+          <input type="number" id="session-manual-count" min="1" max="200" step="1" style="width: 64px;">
+          <span class="help" style="margin: 0;">поз ·</span>
+          <input type="number" id="session-manual-sec" min="5" max="1800" step="5" style="width: 72px;">
+          <span class="help" style="margin: 0;">сек на позу</span>
+        </div>
       </div>
       <div class="field">
         <label>схема</label>
@@ -7864,23 +7873,66 @@ function setLikedMood(id) {
 // Schemes are arrays of [count, seconds]. The numbers below are tuned to
 // roughly fill 30 minutes; duration option scales counts proportionally.
 const SESSION_SCHEMES = {
-  classic:  { label: 'классическая',  intervals: [[5,30],[5,60],[4,120],[2,300],[1,600]] },
+  classic:  { label: 'классическая',    intervals: [[5,30],[5,60],[4,120],[2,300],[1,600]] },
   warmup:   { label: 'только разогрев', intervals: [[10,30],[10,60]] },
-  long:     { label: 'только длинные', intervals: [[6,300]] },
+  long:     { label: 'только длинные',  intervals: [[6,300]] },
+  // Manual — план = N поз × M секунд. Длительность считается автоматом
+  // (N*M) и не берётся из SESSION_DURATIONS. UI прячет «длительность»
+  // и показывает два числовых input'а.
+  manual:   { label: 'вручную', manual: true },
 };
 const SESSION_DURATIONS = [
+  // 5-мин «быстрый этюд» — 5 поз × 60 сек ровно (без масштабирования
+  // от classic-схемы, у которого на коротких длительностях счётчики
+  // не сходятся).
+  { id: 5,  label: '5 мин' },
   { id: 15, label: '15 мин' },
   { id: 30, label: '30 мин' },
   { id: 60, label: '60 мин' },
 ];
 
-let sessionDraft = { duration: 30, scheme: 'classic', query: '' };
+let sessionDraft = {
+  duration: 30,
+  scheme: 'classic',
+  query: '',
+  manualCount: 10,
+  manualSec: 60,
+};
+// Подтянем сохранённые значения вручную из localStorage (если есть).
+try {
+  const saved = JSON.parse(localStorage.getItem('rs:sessionDraft') || '{}');
+  if (typeof saved.manualCount === 'number') sessionDraft.manualCount = saved.manualCount;
+  if (typeof saved.manualSec   === 'number') sessionDraft.manualSec   = saved.manualSec;
+  if (typeof saved.duration    === 'number' && [5,15,30,60].includes(saved.duration)) sessionDraft.duration = saved.duration;
+  if (typeof saved.scheme === 'string' && SESSION_SCHEMES[saved.scheme]) sessionDraft.scheme = saved.scheme;
+} catch (e) {}
+function saveSessionDraft() {
+  try {
+    localStorage.setItem('rs:sessionDraft', JSON.stringify({
+      duration: sessionDraft.duration,
+      scheme: sessionDraft.scheme,
+      manualCount: sessionDraft.manualCount,
+      manualSec: sessionDraft.manualSec,
+    }));
+  } catch (e) {}
+}
 const sessionTimer = createTimer();
 let sessionPoses = [];     // [{item, seconds}]
 let sessionIndex = 0;
 let sessionStartedAt = 0;
 
-function buildSessionPlan(schemeId, durationMin) {
+function buildSessionPlan(schemeId, durationMin, draft = sessionDraft) {
+  // Ручной режим — N поз × M секунд, длительность из inputs (без
+  // SESSION_DURATIONS).
+  if (schemeId === 'manual') {
+    const c = Math.max(1, Math.min(200, draft?.manualCount || 10));
+    const s = Math.max(5, Math.min(1800, draft?.manualSec || 60));
+    return Array(c).fill(s);
+  }
+  // Быстрый этюд — 5 × 60 сек ровно. classic-scaling на 5-мин длительности
+  // даёт неверные счётчики (factor ~0.14 округляется в 1 для каждого
+  // подсегмента → суммарно 18+ минут вместо 5).
+  if (durationMin <= 5) return [60, 60, 60, 60, 60];
   const base = SESSION_SCHEMES[schemeId] || SESSION_SCHEMES.classic;
   const baseTotal = base.intervals.reduce((s, [c, sec]) => s + c * sec, 0);
   const targetTotal = durationMin * 60;
@@ -7906,16 +7958,48 @@ function openSessionSetup() {
   // Defaults
   sessionDraft.query = (document.getElementById('query')?.value || state.query || '').trim();
 
-  // Duration row
+  const isManual = sessionDraft.scheme === 'manual';
+
+  // Manual режим — прячем «длительность», показываем два числовых input.
+  document.getElementById('session-duration-field').hidden = isManual;
+  const manualField = document.getElementById('session-manual-field');
+  if (manualField) {
+    manualField.hidden = !isManual;
+    if (isManual) {
+      const cInp = document.getElementById('session-manual-count');
+      const sInp = document.getElementById('session-manual-sec');
+      if (cInp && document.activeElement !== cInp) cInp.value = sessionDraft.manualCount;
+      if (sInp && document.activeElement !== sInp) sInp.value = sessionDraft.manualSec;
+      // input → live update счётчика summary
+      const sync = () => {
+        const c = parseInt(cInp?.value, 10);
+        const s = parseInt(sInp?.value, 10);
+        if (Number.isFinite(c) && c > 0) sessionDraft.manualCount = c;
+        if (Number.isFinite(s) && s > 0) sessionDraft.manualSec = s;
+        saveSessionDraft();
+        // Только summary обновляем, чтобы не лоушить input focus
+        const plan = buildSessionPlan('manual', 0, sessionDraft);
+        const total = plan.reduce((a, b) => a + b, 0);
+        const sum = document.getElementById('session-summary');
+        if (sum) sum.textContent = `${plan.length} поз · ≈ ${Math.round(total / 60)} минут`;
+      };
+      if (cInp && !cInp.dataset.bound) { cInp.dataset.bound = '1'; cInp.addEventListener('input', sync); }
+      if (sInp && !sInp.dataset.bound) { sInp.dataset.bound = '1'; sInp.addEventListener('input', sync); }
+    }
+  }
+
+  // Duration row (только когда не manual)
   const durRow = document.getElementById('session-duration');
   durRow.innerHTML = '';
-  SESSION_DURATIONS.forEach(d => {
-    const el = document.createElement('span');
-    el.className = 'opt' + (sessionDraft.duration === d.id ? ' active' : '');
-    el.textContent = d.label;
-    el.onclick = () => { sessionDraft.duration = d.id; openSessionSetup(); };
-    durRow.appendChild(el);
-  });
+  if (!isManual) {
+    SESSION_DURATIONS.forEach(d => {
+      const el = document.createElement('span');
+      el.className = 'opt' + (sessionDraft.duration === d.id ? ' active' : '');
+      el.textContent = d.label;
+      el.onclick = () => { sessionDraft.duration = d.id; saveSessionDraft(); openSessionSetup(); };
+      durRow.appendChild(el);
+    });
+  }
 
   // Scheme row
   const schRow = document.getElementById('session-scheme');
@@ -7924,7 +8008,7 @@ function openSessionSetup() {
     const el = document.createElement('span');
     el.className = 'opt' + (sessionDraft.scheme === id ? ' active' : '');
     el.textContent = s.label;
-    el.onclick = () => { sessionDraft.scheme = id; openSessionSetup(); };
+    el.onclick = () => { sessionDraft.scheme = id; saveSessionDraft(); openSessionSetup(); };
     schRow.appendChild(el);
   });
 
@@ -7933,7 +8017,7 @@ function openSessionSetup() {
   if (qInp && document.activeElement !== qInp) qInp.value = sessionDraft.query;
 
   // Summary preview
-  const plan = buildSessionPlan(sessionDraft.scheme, sessionDraft.duration);
+  const plan = buildSessionPlan(sessionDraft.scheme, sessionDraft.duration, sessionDraft);
   const totalSec = plan.reduce((a, b) => a + b, 0);
   const summary = document.getElementById('session-summary');
   if (summary) summary.textContent = `${plan.length} поз · ≈ ${Math.round(totalSec / 60)} минут`;
@@ -7952,7 +8036,7 @@ async function startSession() {
   if (!query) return;
   sessionDraft.query = query;
 
-  const plan = buildSessionPlan(sessionDraft.scheme, sessionDraft.duration);
+  const plan = buildSessionPlan(sessionDraft.scheme, sessionDraft.duration, sessionDraft);
   if (!plan.length) return;
 
   // Prefetch a queue of items for the session
