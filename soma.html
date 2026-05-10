@@ -2550,14 +2550,28 @@
   <!-- Hide submenu — поверх actions при клике на «× скрыть». Только в стопке.
        НЕ ставим data-view-section="stack" — applyVisibility снимет hidden,
        и блок будет всегда видимым. Закрываем вручную в applyView когда
-       юзер переключается на 'feed'. -->
+       юзер переключается на 'feed'.
+       Два «этапа»: pick (что скрыть) → reason (почему). На втором мы
+       собираем фидбек для будущего ранжирования. -->
   <div class="hide-menu" id="hide-menu" hidden>
-    <div class="hide-menu-title">скрыть:</div>
-    <button class="text-link active" data-hide="image">только эту картинку</button>
-    <button class="text-link" data-hide="author" id="hide-menu-author">все от автора</button>
-    <button class="text-link" data-hide="source" id="hide-menu-source">все с источника</button>
-    <span class="hide-menu-sep">·</span>
-    <button class="text-link" data-hide="cancel">отмена</button>
+    <div class="hide-menu-stage" data-stage="pick">
+      <div class="hide-menu-title">скрыть:</div>
+      <button class="text-link active" data-hide="image">только эту картинку</button>
+      <button class="text-link" data-hide="author" id="hide-menu-author">все от автора</button>
+      <button class="text-link" data-hide="source" id="hide-menu-source">все с источника</button>
+      <span class="hide-menu-sep">·</span>
+      <button class="text-link" data-hide="cancel">отмена</button>
+    </div>
+    <div class="hide-menu-stage" data-stage="reason" hidden>
+      <div class="hide-menu-title">почему:</div>
+      <button class="text-link" data-reason="quality">плохое качество</button>
+      <button class="text-link" data-reason="irrelevant">нерелевантно</button>
+      <button class="text-link" data-reason="dislike">не нравится</button>
+      <button class="text-link" data-reason="off-topic">вне темы</button>
+      <button class="text-link" data-reason="duplicate">повтор</button>
+      <span class="hide-menu-sep">·</span>
+      <button class="text-link" data-reason="skip">пропустить</button>
+    </div>
   </div>
 
   <!-- Feed view (designer mode) -->
@@ -9024,17 +9038,36 @@ bind('btn-open', () => {
   }
 });
 
-// «× скрыть» — открывает inline-меню. Опции зависят от текущей карточки:
-//  - всегда: «только эту картинку»
-//  - если есть автор и authorId/author: «все от автора {имя}»
-//  - всегда: «все с {источника}»
+// «× скрыть» — открывает inline-меню в два этапа:
+//   1) pick: «что скрыть» (картинка / автор / источник)
+//   2) reason: «почему» (плохое качество / нерелевантно / не нравится / ...)
+// Причина уходит в historyLog для последующего ranking-фидбека. Кнопка
+// «пропустить» выполняет скрытие без причины.
+
+let pendingHide = null;   // { action, item } между этапами
+
+const HIDE_REASON_LABEL = {
+  quality:    'плохое качество',
+  irrelevant: 'нерелевантно',
+  dislike:    'не нравится',
+  'off-topic': 'вне темы',
+  duplicate:  'повтор',
+  skip:       null,        // пропущено — reason остаётся null
+};
+
+function setHideMenuStage(stage) {
+  document.querySelectorAll('#hide-menu .hide-menu-stage').forEach(el => {
+    el.hidden = el.getAttribute('data-stage') !== stage;
+  });
+}
+
 function openHideMenu() {
   const item = state.current;
   if (!item) return;
   const menu = document.getElementById('hide-menu');
   const actions = document.querySelector('.actions[data-view-section="stack"]');
   if (!menu || !actions) return;
-  // Динамически выставляем тексты опций — имя автора, источник.
+  // Динамически выставляем тексты опций «pick»-этапа.
   const authorBtn = document.getElementById('hide-menu-author');
   const sourceBtn = document.getElementById('hide-menu-source');
   if (authorBtn) {
@@ -9045,9 +9078,9 @@ function openHideMenu() {
       authorBtn.hidden = true;
     }
   }
-  if (sourceBtn) {
-    sourceBtn.textContent = `все с ${item.source}`;
-  }
+  if (sourceBtn) sourceBtn.textContent = `все с ${item.source}`;
+  pendingHide = null;
+  setHideMenuStage('pick');
   actions.style.display = 'none';
   menu.hidden = false;
 }
@@ -9056,46 +9089,110 @@ function closeHideMenu() {
   const actions = document.querySelector('.actions[data-view-section="stack"]');
   if (menu) menu.hidden = true;
   if (actions) actions.style.removeProperty('display');
+  pendingHide = null;
+  setHideMenuStage('pick');   // готовим для следующего открытия
 }
+
+// Снимок текущего контекста — пригодится в payload истории для будущего
+// ranking-фидбека (см. п.4: подвкладка «скрытия» с детальной инфой).
+function snapshotHideContext() {
+  // Текущий тег = label preset'а, чей q совпадает с state.query
+  let tagLabel = null;
+  try {
+    const items = CATEGORIES?.[activeCategory] || [];
+    const m = items.find(p => p.q === String(state.query || '').trim());
+    if (m) tagLabel = m.label;
+  } catch (e) {}
+  const ctx = {
+    mode: state.mode,
+    category: activeCategory || null,
+    tag: tagLabel,
+    query: state.query || '',
+  };
+  if (state.mode === 'designer') {
+    ctx.platform = state.designerPlatform;
+    ctx.domain = state.designerDomain;
+  } else if (state.mode === 'aesthetic') {
+    ctx.theme = state.aestheticTheme;
+  } else if (state.mode === 'artist') {
+    ctx.artistLevel = state.artistLevel;
+  }
+  // Активный кастомный пресет (если есть)
+  try {
+    const pid = state.activeCustomPreset?.[state.mode];
+    if (pid) {
+      const p = state.customPresets?.find(x => x.id === pid);
+      ctx.preset = p ? p.label : pid;
+    }
+  } catch (e) {}
+  return ctx;
+}
+
+async function executeHide(action, item, reasonId) {
+  const cat = activeCategory || null;
+  const cLabel = cat ? `в разделе «${cat}»` : '';
+  let ok = false;
+  if (action === 'image') {
+    ok = cat ? categoryHideAdd(cat, 'image', item.url || item.thumb)
+             : await blocklistAdd('image', item.url || item.thumb);
+    somaToast(ok ? `картинка скрыта ${cLabel}`.trim() : 'не получилось', 2000, !ok);
+  } else if (action === 'author') {
+    const val = { name: item.author, source: item.source };
+    ok = cat ? categoryHideAdd(cat, 'author', val) : await blocklistAdd('author', val);
+    somaToast(ok ? `автор «${item.author}» скрыт ${cLabel}`.trim() : 'не получилось', 2200, !ok);
+  } else if (action === 'source') {
+    ok = cat ? categoryHideAdd(cat, 'source', item.source)
+             : await blocklistAdd('source', item.source);
+    somaToast(ok ? `источник «${item.source}» скрыт ${cLabel}`.trim() : 'не получилось', 2400, !ok);
+    try { renderSources(); } catch (e) {}
+  }
+  if (ok) {
+    pushRecentlySkipped(item);
+    // Полный snapshot: type, value (нормализованный), причина (null =
+    // юзер пропустил), и весь контекст где это произошло.
+    const valueRepr = action === 'author'
+      ? { name: item.author, source: item.source }
+      : (action === 'source' ? item.source : (item.url || item.thumb));
+    historyLog('hide', {
+      type: action,
+      value: valueRepr,
+      itemId: item.id,
+      source: item.source,
+      author: item.author || null,
+      title: item.title || null,
+      reason: reasonId && reasonId !== 'skip' ? reasonId : null,
+      reasonLabel: HIDE_REASON_LABEL[reasonId] || null,
+      ...snapshotHideContext(),
+    });
+    const filtered = state.queue.filter(it => !isBlocklistedItem(it));
+    state.queue = filtered[0]?.id === item.id ? filtered.slice(1) : filtered;
+    renderCard();
+    if (state.queue.length < 5) refillQueue();
+  }
+}
+
 bind('btn-hide', openHideMenu);
+
+// Этап 1 — выбор «что скрыть». Cancel → закрываем, остальное → этап 2.
 document.querySelectorAll('#hide-menu [data-hide]').forEach(btn => {
-  btn.addEventListener('click', async () => {
+  btn.addEventListener('click', () => {
     const action = btn.getAttribute('data-hide');
+    if (action === 'cancel') { closeHideMenu(); return; }
     const item = state.current;
+    if (!item) { closeHideMenu(); return; }
+    pendingHide = { action, item };
+    setHideMenuStage('reason');
+  });
+});
+
+// Этап 2 — выбор причины. Skip → executes hide без причины.
+document.querySelectorAll('#hide-menu [data-reason]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const reasonId = btn.getAttribute('data-reason');
+    const pending = pendingHide;
     closeHideMenu();
-    if (!item || action === 'cancel') return;
-    // Скрываем В РАЗДЕЛЕ (per-category, local). Глобальный blocklist
-    // на бэке трогаем только если категории нет (фолбэк).
-    const cat = activeCategory || null;
-    const cLabel = cat ? `в разделе «${cat}»` : '';
-    let ok = false;
-    if (action === 'image') {
-      ok = cat ? categoryHideAdd(cat, 'image', item.url || item.thumb)
-               : await blocklistAdd('image', item.url || item.thumb);
-      somaToast(ok ? `картинка скрыта ${cLabel}`.trim() : 'не получилось', 2000, !ok);
-    } else if (action === 'author') {
-      const val = { name: item.author, source: item.source };
-      ok = cat ? categoryHideAdd(cat, 'author', val) : await blocklistAdd('author', val);
-      somaToast(ok ? `автор «${item.author}» скрыт ${cLabel}`.trim() : 'не получилось', 2200, !ok);
-    } else if (action === 'source') {
-      ok = cat ? categoryHideAdd(cat, 'source', item.source)
-               : await blocklistAdd('source', item.source);
-      somaToast(ok ? `источник «${item.source}» скрыт ${cLabel}`.trim() : 'не получилось', 2400, !ok);
-      try { renderSources(); } catch (e) {}
-    }
-    if (ok) {
-      // Дёргаем skip и оставшуюся очередь профильтровываем (item уберётся
-      // вместе со всеми похожими по правилу blocklist).
-      pushRecentlySkipped(item);
-      historyLog('hide', { type: action, source: item.source, author: item.author, id: item.id });
-      // 1.1.6: Аккуратное удаление current'а. После filter() current может уже
-      // отсутствовать (если он сам blocklisted) — тогда shift() удалит следующего.
-      // Поэтому проверяем head, и shift только если current ещё там.
-      const filtered = state.queue.filter(it => !isBlocklistedItem(it));
-      state.queue = filtered[0]?.id === item.id ? filtered.slice(1) : filtered;
-      renderCard();
-      if (state.queue.length < 5) refillQueue();
-    }
+    if (!pending) return;
+    await executeHide(pending.action, pending.item, reasonId);
   });
 });
 
