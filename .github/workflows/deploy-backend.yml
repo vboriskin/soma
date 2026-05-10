@@ -7,6 +7,13 @@ on:
       - 'backend/**'
       - 'deploy/**'
       - '.github/workflows/deploy-backend.yml'
+      # Frontend файлы — тоже триггерят деплой, потому что бэкенд их
+      # раздаёт через nginx (см. deploy/build-frontend.sh → /opt/soma/frontend).
+      - 'soma.html'
+      - 'sw.js'
+      - 'rituals.json'
+      - 'manifest.webmanifest'
+      - '*.svg'
   workflow_dispatch: {}        # ручной запуск из UI
 
 jobs:
