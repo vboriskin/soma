@@ -4400,6 +4400,14 @@ const state = {
   // мутации (add/remove). Если бэк недоступен — пустые списки, фильтрация
   // на бэке всё равно отработает при следующем search.
   blocklist: { images: [], authors: [], sources: [] },
+  // ---- Per-category «скрытое» (local, через localStorage) ----
+  // Кнопка «скрыть» из карточки кладёт элемент СЮДА (в текущий раздел),
+  // а не в глобальный blocklist выше. Если юзер потом перейдёт в другой
+  // раздел — скрытие туда не унаследуется. Структура:
+  //   { [categoryName]: { images: [url], authors: [{name,source}], sources: [id] } }
+  // Глобальный state.blocklist остаётся как «старые» скрытия + источник
+  // правды для бэкенда (он его всё равно фильтрует server-side).
+  categoryBlocklist: {},
 };
 
 // ============== PRESETS ==============
@@ -5059,6 +5067,9 @@ function storageSet(key, value) {
 }
 
 function loadState() {
+  // Per-category blocklist (local — не идёт на бэк)
+  state.categoryBlocklist = loadCategoryBlocklist();
+
   try {
     const r = storageGet('rs:keys');
     if (r) state.keys = JSON.parse(r);
@@ -6278,17 +6289,86 @@ async function blocklistRemove(type, value) {
   } catch (e) { console.warn('[blocklist remove]', e.message); return false; }
 }
 
+// ============== CATEGORY-SCOPED HIDE (local) ==============
+// Чтобы скрытие из одного раздела не утаскивало автора/источник в другой,
+// держим параллельный per-category blocklist в localStorage. Глобальный
+// blocklist выше — для legacy и cross-device скрытий через бэк.
+function loadCategoryBlocklist() {
+  try {
+    const raw = localStorage.getItem('rs:catBlocklist');
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+function saveCategoryBlocklist() {
+  try { localStorage.setItem('rs:catBlocklist', JSON.stringify(state.categoryBlocklist || {})); } catch (e) {}
+}
+function categoryHideAdd(category, type, value) {
+  if (!category) return false;
+  if (!state.categoryBlocklist) state.categoryBlocklist = {};
+  if (!state.categoryBlocklist[category]) {
+    state.categoryBlocklist[category] = { images: [], authors: [], sources: [] };
+  }
+  const bl = state.categoryBlocklist[category];
+  if (type === 'image') {
+    if (!bl.images.includes(value)) bl.images.push(value);
+  } else if (type === 'source') {
+    if (!bl.sources.includes(value)) bl.sources.push(value);
+  } else if (type === 'author' && value && value.name && value.source) {
+    const k = `${value.name}|${value.source}`;
+    if (!bl.authors.some(a => `${a.name}|${a.source}` === k)) bl.authors.push(value);
+  } else {
+    return false;
+  }
+  saveCategoryBlocklist();
+  historyLog('hide-category', { category, type, value });
+  return true;
+}
+function categoryHideRemove(category, type, value) {
+  const m = state.categoryBlocklist;
+  if (!m || !m[category]) return false;
+  const bl = m[category];
+  if (type === 'image') bl.images = bl.images.filter(i => i !== value);
+  else if (type === 'source') bl.sources = bl.sources.filter(s => s !== value);
+  else if (type === 'author') {
+    const k = `${value.name}|${value.source}`;
+    bl.authors = bl.authors.filter(a => `${a.name}|${a.source}` !== k);
+  } else return false;
+  // Если категория опустошилась — удалим запись чтоб не плодить пустышки
+  if (!bl.images.length && !bl.authors.length && !bl.sources.length) {
+    delete state.categoryBlocklist[category];
+  }
+  saveCategoryBlocklist();
+  return true;
+}
+
 // Локальная проверка — не идём на бэк, используем закэшированный snapshot.
-function isBlocklistedItem(item) {
+// Учитывает оба слоя: глобальный blocklist (с бэка) + per-category
+// (local). Per-category работает только в контексте своего раздела.
+function isBlocklistedItem(item, ctx = {}) {
   if (!item) return false;
+  // Глобальный blocklist (с бэка) — применяется везде.
   const bl = state.blocklist || { images: [], authors: [], sources: [] };
   if (bl.sources && bl.sources.includes(item.source)) return true;
   if (bl.images && (bl.images.includes(item.url) || bl.images.includes(item.thumb))) return true;
   if (bl.authors && item.author && item.source) {
     const key = `${String(item.author).trim().toLowerCase()}|${String(item.source).trim().toLowerCase()}`;
-    return bl.authors.some(a =>
+    if (bl.authors.some(a =>
       `${String(a.name).trim().toLowerCase()}|${String(a.source).trim().toLowerCase()}` === key
-    );
+    )) return true;
+  }
+  // Per-category blocklist — действителен только в активном разделе.
+  const cat = ctx.category != null ? ctx.category : (typeof activeCategory !== 'undefined' ? activeCategory : null);
+  const cm = state.categoryBlocklist;
+  if (cat && cm && cm[cat]) {
+    const cb = cm[cat];
+    if (cb.sources && cb.sources.includes(item.source)) return true;
+    if (cb.images && (cb.images.includes(item.url) || cb.images.includes(item.thumb))) return true;
+    if (cb.authors && item.author && item.source) {
+      const key = `${String(item.author).trim().toLowerCase()}|${String(item.source).trim().toLowerCase()}`;
+      if (cb.authors.some(a =>
+        `${String(a.name).trim().toLowerCase()}|${String(a.source).trim().toLowerCase()}` === key
+      )) return true;
+    }
   }
   return false;
 }
@@ -8931,18 +9011,23 @@ document.querySelectorAll('#hide-menu [data-hide]').forEach(btn => {
     const item = state.current;
     closeHideMenu();
     if (!item || action === 'cancel') return;
+    // Скрываем В РАЗДЕЛЕ (per-category, local). Глобальный blocklist
+    // на бэке трогаем только если категории нет (фолбэк).
+    const cat = activeCategory || null;
+    const cLabel = cat ? `в разделе «${cat}»` : '';
     let ok = false;
     if (action === 'image') {
-      ok = await blocklistAdd('image', item.url || item.thumb);
-      somaToast(ok ? 'картинка скрыта' : 'не получилось', 1800, !ok);
+      ok = cat ? categoryHideAdd(cat, 'image', item.url || item.thumb)
+               : await blocklistAdd('image', item.url || item.thumb);
+      somaToast(ok ? `картинка скрыта ${cLabel}`.trim() : 'не получилось', 2000, !ok);
     } else if (action === 'author') {
-      ok = await blocklistAdd('author', { name: item.author, source: item.source });
-      somaToast(ok ? `автор «${item.author}» скрыт` : 'не получилось', 1800, !ok);
+      const val = { name: item.author, source: item.source };
+      ok = cat ? categoryHideAdd(cat, 'author', val) : await blocklistAdd('author', val);
+      somaToast(ok ? `автор «${item.author}» скрыт ${cLabel}`.trim() : 'не получилось', 2200, !ok);
     } else if (action === 'source') {
-      ok = await blocklistAdd('source', item.source);
-      somaToast(ok ? `источник «${item.source}» скрыт` : 'не получилось', 2200, !ok);
-      // При скрытии источника — обновляем список enabled на UI (он же дальше
-      // не будет дёргаться, но видеть это в настройках полезно).
+      ok = cat ? categoryHideAdd(cat, 'source', item.source)
+               : await blocklistAdd('source', item.source);
+      somaToast(ok ? `источник «${item.source}» скрыт ${cLabel}`.trim() : 'не получилось', 2400, !ok);
       try { renderSources(); } catch (e) {}
     }
     if (ok) {
@@ -9661,28 +9746,56 @@ function renderBlocklistSummary() {
   const wrap = document.getElementById('blocklist-summary');
   if (!wrap) return;
   const bl = state.blocklist || { images: [], authors: [], sources: [] };
-  const total = (bl.images?.length || 0) + (bl.authors?.length || 0) + (bl.sources?.length || 0);
-  if (!total) {
+  const cm = state.categoryBlocklist || {};
+  const globalTotal = (bl.images?.length || 0) + (bl.authors?.length || 0) + (bl.sources?.length || 0);
+  const catEntries = Object.entries(cm).filter(([_, b]) =>
+    (b.images?.length || 0) + (b.authors?.length || 0) + (b.sources?.length || 0) > 0
+  );
+  if (!globalTotal && !catEntries.length) {
     wrap.innerHTML = `<p class="help" style="font-style: italic; color: var(--ink-soft);">пока пусто · скрывай ненужное через «× скрыть» под карточкой.</p>`;
     return;
   }
-  wrap.innerHTML = `
-    <div class="blocklist-rows">
-      ${renderBlocklistRow('images',  'картинки',  bl.images || [])}
-      ${renderBlocklistRow('authors', 'авторы',   bl.authors || [])}
-      ${renderBlocklistRow('sources', 'источники',bl.sources || [])}
-    </div>
-    <p class="help" style="margin-top: 10px; font-style: italic; color: var(--ink-soft);">всего скрыто: ${total}</p>
-  `;
-  // Restore-кнопки.
+  // Global section
+  let html = '';
+  if (globalTotal) {
+    html += `
+      <div style="margin-bottom: 16px;">
+        <p class="help" style="margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.18em; font-size: 9px;">везде</p>
+        <div class="blocklist-rows">
+          ${renderBlocklistRow('images',  'картинки',  bl.images || [], null)}
+          ${renderBlocklistRow('authors', 'авторы',   bl.authors || [], null)}
+          ${renderBlocklistRow('sources', 'источники',bl.sources || [], null)}
+        </div>
+      </div>`;
+  }
+  // Category sections — отдельной плашкой на каждый раздел
+  for (const [cat, b] of catEntries) {
+    const subTotal = (b.images?.length || 0) + (b.authors?.length || 0) + (b.sources?.length || 0);
+    html += `
+      <div style="margin-bottom: 16px;">
+        <p class="help" style="margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.18em; font-size: 9px;">раздел · ${escapeHtml(cat)} · ${subTotal}</p>
+        <div class="blocklist-rows">
+          ${renderBlocklistRow('images',  'картинки',  b.images || [], cat)}
+          ${renderBlocklistRow('authors', 'авторы',   b.authors || [], cat)}
+          ${renderBlocklistRow('sources', 'источники',b.sources || [], cat)}
+        </div>
+      </div>`;
+  }
+  const grandTotal = globalTotal + catEntries.reduce((s, [, b]) => s + (b.images?.length || 0) + (b.authors?.length || 0) + (b.sources?.length || 0), 0);
+  html += `<p class="help" style="margin-top: 10px; font-style: italic; color: var(--ink-soft);">всего скрыто: ${grandTotal}</p>`;
+  wrap.innerHTML = html;
+  // Restore-кнопки (вариант для глобального — без data-category; для
+  // category-scoped — c data-category).
   wrap.querySelectorAll('[data-blocklist-remove]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const type = btn.getAttribute('data-blocklist-type');
+      const cat  = btn.getAttribute('data-category') || null;
       let value = btn.getAttribute('data-blocklist-value');
       if (type === 'author') {
         value = { name: btn.getAttribute('data-author-name'), source: btn.getAttribute('data-author-source') };
       }
-      const ok = await blocklistRemove(type, value);
+      const ok = cat ? categoryHideRemove(cat, type, value)
+                     : await blocklistRemove(type, value);
       if (ok) {
         somaToast('возвращено', 1500);
         renderBlocklistSummary();
@@ -9693,23 +9806,24 @@ function renderBlocklistSummary() {
   });
 }
 
-function renderBlocklistRow(type, label, items) {
+function renderBlocklistRow(type, label, items, category = null) {
   if (!items.length) {
     return `<div class="blocklist-row"><span>${label} · 0</span></div>`;
   }
+  const catAttr = category ? ` data-category="${escapeHtml(category)}"` : '';
   const list = items.map((it, i) => {
     if (type === 'authors') {
       const name = it.name || '?'; const src = it.source || '?';
       return `<div class="blocklist-item">
         <span>${escapeHtml(name)} · <span style="color: var(--ink-soft);">${escapeHtml(src)}</span></span>
-        <button class="text-link" data-blocklist-remove data-blocklist-type="author"
+        <button class="text-link" data-blocklist-remove data-blocklist-type="author"${catAttr}
           data-author-name="${escapeHtml(name)}" data-author-source="${escapeHtml(src)}">вернуть</button>
       </div>`;
     }
     if (type === 'sources') {
       return `<div class="blocklist-item">
         <span>${escapeHtml(it)}</span>
-        <button class="text-link" data-blocklist-remove data-blocklist-type="source"
+        <button class="text-link" data-blocklist-remove data-blocklist-type="source"${catAttr}
           data-blocklist-value="${escapeHtml(it)}">вернуть</button>
       </div>`;
     }
@@ -9718,7 +9832,7 @@ function renderBlocklistRow(type, label, items) {
     try { short = new URL(short).hostname + (new URL(short).pathname || '').slice(0, 24); } catch (e) {}
     return `<div class="blocklist-item">
       <span style="font-family: monospace; font-size: 10px;">${escapeHtml(short)}</span>
-      <button class="text-link" data-blocklist-remove data-blocklist-type="image"
+      <button class="text-link" data-blocklist-remove data-blocklist-type="image"${catAttr}
         data-blocklist-value="${escapeHtml(it)}">вернуть</button>
     </div>`;
   }).join('');
