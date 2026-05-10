@@ -1016,6 +1016,19 @@
     color: var(--ink-mid);
   }
   .filter-row .filter-label { color: var(--ink-soft); }
+  /* Labels на других строках чипов (раздел/тег) — те же шрифт и цвет,
+     что и filter-row, но scope-independent. */
+  .categories .row-label,
+  .preset-row .row-label {
+    color: var(--ink-soft);
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: 14px;
+    user-select: none;
+    flex: 0 0 auto;
+    align-self: center;
+  }
   .filter-row .filter-sep { color: var(--ink-soft); margin: 0 4px; }
   .filter-row .filter-opt {
     color: var(--ink-mid);
@@ -8613,6 +8626,12 @@ function renderCategories() {
   const isArtist   = state.mode === 'artist';
   const level = state.artistLevel || 'all';
   let dividerInserted = false;
+  // Подпись «раздел ·» в стиле filter-row labels — добавляем сразу,
+  // снимем ниже если category-список окажется пуст.
+  const lab = document.createElement('span');
+  lab.className = 'row-label';
+  lab.textContent = 'раздел ·';
+  cats.appendChild(lab);
   // 5.3: режим collapse — показываем первые 5 + «ещё ↓» если их больше 5.
   // Если активная категория не в первой пятёрке — поднимаем её на первое место,
   // чтобы юзер всегда видел свой выбор без раскрытия.
@@ -8628,6 +8647,11 @@ function renderCategories() {
   let names = allNames;
   if (collapseMode && activeCategory && allNames.includes(activeCategory)) {
     names = [activeCategory, ...allNames.filter(n => n !== activeCategory)];
+  }
+  if (!names.length) {
+    // нет категорий под текущий фильтр — убираем label и выходим
+    cats.innerHTML = '';
+    return;
   }
   if (collapseMode) cats.classList.add('is-collapsed');
   names.forEach(name => {
@@ -8698,6 +8722,12 @@ function renderPresets() {
   const row = document.getElementById('preset-row');
   row.innerHTML = '';
   const items = CATEGORIES[activeCategory] || [];
+  if (!items.length) return;   // пустой раздел — не показываем даже label
+  // Подпись «тег ·» — в одной стилистике с filter-row.
+  const lab = document.createElement('span');
+  lab.className = 'row-label';
+  lab.textContent = 'тег ·';
+  row.appendChild(lab);
   items.forEach(item => {
     const el = document.createElement('span');
     el.className = 'preset';
