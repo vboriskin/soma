@@ -3252,9 +3252,11 @@ const BACKEND_URL = (() => {
   if (!host || host === 'localhost' || host === '127.0.0.1' || location.protocol === 'file:') {
     return 'http://localhost:8787';
   }
-  // Production — живой бэкенд. Меняй на свой prod-URL после деплоя на Fly.
+  // Production — живой бэкенд на VDS (Timeweb Amsterdam). nip.io резолвит
+  // `<ip-with-dashes>.nip.io` в IP сервера, поэтому домен покупать не
+  // обязательно (для альфы). Когда купим — заменим на `api.soma.example`.
   // Cloudflare Pages preview-деплои (*.pages.dev) тоже идут сюда.
-  return 'https://soma-backend.fly.dev';
+  return 'https://94-241-174-144.nip.io';
 })();
 
 // ============== Alpha-key gate (закрытая альфа) ==============

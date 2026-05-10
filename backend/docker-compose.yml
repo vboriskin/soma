@@ -1,0 +1,51 @@
+# SOMA backend — production-стек на VDS (Timeweb / Hetzner / любой Linux).
+# Собирается из локального Dockerfile, маунтит persistent volume, открывает
+# 8787 наружу localhost'a. Снаружи смотрит nginx (см. deploy/nginx-soma.conf).
+#
+# Запуск:
+#   cd /opt/soma/backend && docker compose up -d --build
+# Логи:
+#   docker compose logs -f --tail 100
+# Стоп:
+#   docker compose down
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: soma-backend:latest
+    container_name: soma-backend
+    restart: unless-stopped
+    # Прибиваем порт к 127.0.0.1 — наружу его раздаёт nginx по 443.
+    # Без этого UFW и Docker могут конфликтовать (Docker делает свои iptables-
+    # правила в обход ufw, и порт 8787 светил бы публично).
+    ports:
+      - "127.0.0.1:8787:8787"
+    env_file:
+      - /opt/soma/secrets.env
+    environment:
+      - NODE_ENV=production
+      - PORT=8787
+      - DATA_DIR=/data
+    volumes:
+      - /var/lib/soma:/data
+    # Лимиты памяти — Playwright Chromium хочет ~700 МБ; даём 1.5 ГБ
+    # (на VDS с 2 ГБ оставляем 500 МБ системе и nginx).
+    deploy:
+      resources:
+        limits:
+          memory: 1500M
+    # Healthcheck дублирует Dockerfile, но docker compose читает именно эту
+    # секцию для статуса `docker ps`.
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8787/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

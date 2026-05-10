@@ -1,8 +1,8 @@
 # SOMA — deploy guide
 
-Закрытая альфа на Cloudflare Pages (фронт) + Fly.io (бэк) + GitHub Actions
-(автодеплой бэка при push в `main`). Кастомный домен прикручиваем в самом
-конце.
+Закрытая альфа: фронт на **Cloudflare Pages**, бэк на **Timeweb VDS
+(Amsterdam)**, автодеплой через **GitHub Actions** по SSH. Доступ закрыт
+**alpha-key**'ом.
 
 ## Архитектура
 
@@ -10,222 +10,280 @@
 github.com/vboriskin/soma  ─┬─► Cloudflare Pages   ─►  https://soma-frontend.pages.dev
                             │   (build: deploy/build-frontend.sh, output: dist)
                             │
-                            └─► Fly.io (GitHub Actions) ─►  https://soma-backend.fly.dev
-                                (Dockerfile в backend/)        + persistent volume /data
+                            └─► GitHub Actions ──ssh──► Timeweb VDS
+                                                        ├── docker compose: soma-backend container
+                                                        ├── nginx + Let's Encrypt
+                                                        └── /var/lib/soma → persistent
 ```
 
-Закрыто **alpha-ключом**: фронт спрашивает ключ при первом заходе, шлёт в
-header `X-Alpha-Key`, бэк проверяет через env `ALPHA_KEY`.
+Бэкенд доступен по `https://<IP-with-dashes>.nip.io` (для альфы — без
+покупки домена). Когда дойдут руки до домена — DNS-запись + 1 правка в
+nginx-конфиге + 1 правка `BACKEND_URL` во фронте.
 
 ---
 
-## Шаг 1 — Fly.io бэкенд
+## Шаг 0 — что уже есть
 
-### 1.1 Зарегистрировать аккаунт
-https://fly.io/app/sign-up — нужна карта (с неё спишут $0; alpha-ресурсы
-влезают в free tier).
+VDS на Timeweb (`94.241.174.144`, Amsterdam, Ubuntu 24.04, 2 ГБ RAM).
+Cloud-init поставил Docker, Compose, nginx, certbot, ufw. SSH-ключ
+загружен (`~/.ssh/soma_deploy` локально, `authorized_keys` на сервере).
 
-### 1.2 Поставить flyctl локально
+---
+
+## Шаг 1 — Bootstrap сервера (один раз)
+
+На своей машине:
+
 ```bash
-brew install flyctl
-fly auth login
+ssh -i ~/.ssh/soma_deploy root@94.241.174.144
 ```
 
-### 1.3 Создать приложение и volume
+На сервере:
+
 ```bash
-cd backend
-fly apps create soma-backend                          # имя должно совпадать с fly.toml
-fly volumes create soma_data --region fra --size 3    # 3 ГБ под SQLite/cookies/cache
+# Запускаем bootstrap-скрипт прямо из репо
+curl -fsSL https://raw.githubusercontent.com/vboriskin/soma/main/deploy/bootstrap-vds.sh | bash
 ```
-Если регион Frankfurt не подходит — отредактируй `primary_region` в
-`backend/fly.toml` и используй тот же код в `volumes create`.
 
-### 1.4 Сгенерить alpha-ключ и положить секреты
+Скрипт:
+- клонирует репо в `/opt/soma`
+- создаёт пустой `/opt/soma/secrets.env`
+- ставит nginx-конфиг для `94-241-174-144.nip.io`
+- выпускает Let's Encrypt сертификат (HTTP challenge, ~30 сек)
+
+Если certbot ругается — проверь что 80 порт открыт извне
+(`curl http://94-241-174-144.nip.io/` с локального мака должно отдать
+nginx-страницу или ошибку).
+
+### Заполнить секреты
+
 ```bash
-# Сгенерируй случайный ключ (32 hex-символа):
-openssl rand -hex 16
-# скажем, получилось: 7a3f2b8d4e1c9f5a6b8d2e3f4a1b9c8d
-
-cd backend
-fly secrets set ALPHA_KEY=7a3f2b8d4e1c9f5a6b8d2e3f4a1b9c8d
-fly secrets set TUMBLR_KEY=...           # из локального .env
-fly secrets set DA_CLIENT_ID=...
-fly secrets set DA_SECRET=...
-fly secrets set ARENA_TOKEN=...
-fly secrets set DRIBBBLE_CLIENT_ID=...
-fly secrets set DRIBBBLE_CLIENT_SECRET=...
-fly secrets set DRIBBBLE_COOKIE=...
-fly secrets set NYPL_TOKEN=...
-fly secrets set OPENSEA_KEY=...
-fly secrets set ALLOW_PAGES_DEV=1        # пока не привязали кастомный домен
+nano /opt/soma/secrets.env
 ```
-**Сохрани ALPHA_KEY где-то** — будешь раздавать друзьям как инвайт.
-Список всех секретов из бэкенда — в `backend/.env.example`.
 
-### 1.5 Первый деплой вручную
-```bash
-fly deploy --remote-only
+Скопируй из локального `backend/.env` всё нужное:
+
 ```
-Сборка ~3–5 минут (тащит Playwright-образ ~600 МБ → собирает Node deps →
-пушит в Fly registry → запускает машину). Когда увидишь `Visit your newly
-deployed app at https://soma-backend.fly.dev/` — открой в браузере, должно
-быть `soma backend — ok`.
+ALPHA_KEY=<32 hex символа: openssl rand -hex 16>
+ALLOWED_ORIGINS=https://soma-frontend.pages.dev
+ALLOW_PAGES_DEV=1
 
-Проверить gate:
+TUMBLR_KEY=...
+DA_CLIENT_ID=...
+DA_SECRET=...
+ARENA_TOKEN=...
+DRIBBBLE_CLIENT_ID=...
+DRIBBBLE_CLIENT_SECRET=...
+DRIBBBLE_COOKIE=...
+NYPL_TOKEN=...
+OPENSEA_KEY=...
+```
+
+**Сохрани ALPHA_KEY где-то у себя — это будущий инвайт-код для друзей.**
+
+### Первый запуск контейнера
+
 ```bash
-curl https://soma-backend.fly.dev/healthz
+cd /opt/soma/backend
+docker compose up -d --build
+```
+
+Сборка ~4–5 минут (тащит Playwright-image ~600 МБ → ставит npm deps).
+Потом:
+
+```bash
+docker compose ps               # Status: healthy ожидаем
+curl https://94-241-174-144.nip.io/healthz
 # {"ok":true,"ts":...}
 
-curl https://soma-backend.fly.dev/api/info
+curl https://94-241-174-144.nip.io/api/info
 # {"error":"alpha-key required",...}    ← правильно
 
-curl -H 'X-Alpha-Key: ВАШ_КЛЮЧ' https://soma-backend.fly.dev/api/info
+curl -H "X-Alpha-Key: <ваш_ключ>" https://94-241-174-144.nip.io/api/info
 # {"backend":...}                       ← правильно
 ```
 
-### 1.6 Настроить автодеплой через GitHub Actions
+---
+
+## Шаг 2 — GitHub Actions secrets
+
+Чтобы push в `main` автоматически деплоил на VDS:
+
 ```bash
-fly tokens create deploy -x 999999h     # долгоживущий токен для CI
-# скопировать вывод (начинается с FlyV1 fm2_...)
+# На своей машине — создаём отдельный SSH-ключ для CI
+ssh-keygen -t ed25519 -f ~/.ssh/soma_ci -N "" -C "soma-ci"
+# Кладём pub-часть на сервер
+ssh-copy-id -i ~/.ssh/soma_ci.pub root@94.241.174.144
+# Проверяем
+ssh -i ~/.ssh/soma_ci root@94.241.174.144 "echo ok"
+# Получаем приватный ключ для GH:
+cat ~/.ssh/soma_ci
 ```
-GitHub: **Settings → Secrets and variables → Actions → New repository
-secret**:
-- `Name`: `FLY_API_TOKEN`
-- `Value`: вставить токен
 
-Готово — теперь любой `git push origin main`, который меняет файлы в
-`backend/`, автоматически запускает `flyctl deploy` через
-`.github/workflows/deploy-backend.yml`.
+GitHub: репо → **Settings → Secrets and variables → Actions** → New
+repository secret. Создаём три секрета:
 
----
+| Name | Value |
+|---|---|
+| `VDS_HOST` | `94.241.174.144` |
+| `VDS_USER` | `root` |
+| `VDS_SSH_KEY` | содержимое `~/.ssh/soma_ci` (приватный ключ, **не .pub**) |
 
-## Шаг 2 — Cloudflare Pages фронтенд
-
-### 2.1 Зарегистрировать Cloudflare
-https://dash.cloudflare.com/sign-up
-
-### 2.2 Подключить репо к Pages
-1. Cloudflare Dashboard → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
-2. Авторизоваться в GitHub, выбрать репо `vboriskin/soma`
-3. **Project name**: `soma-frontend`
-4. **Production branch**: `main`
-5. **Framework preset**: None
-6. **Build command**: `bash deploy/build-frontend.sh`
-7. **Build output directory**: `dist`
-8. **Root directory** (advanced): оставить пустым (=корень репо)
-9. **Save and Deploy**
-
-Через ~30 сек проект задеплоится на `https://soma-frontend.pages.dev`.
-Зайди — должна загрузиться SOMA. Браузер спросит alpha-ключ — введи тот,
-что ты положил в Fly secrets.
-
-### 2.3 (Только если меняли имена) обновить URL'ы в коде
-Если назвал Fly-приложение **не** `soma-backend` — найди в `soma.html`:
-```js
-return 'https://soma-backend.fly.dev';
-```
-Замени на свой домен и закоммить. Аналогично — Cloudflare Pages в
-`fly.toml` (`ALLOWED_ORIGINS`) если имя проекта Pages не `soma-frontend`.
+Готово. Теперь `git push origin main` с правкой в `backend/` или
+`deploy/` запускает workflow (`.github/workflows/deploy-backend.yml`),
+который SSH-ит в сервер и выполняет `bash deploy/deploy-vds.sh`.
 
 ---
 
-## Шаг 3 — Проверка end-to-end
+## Шаг 3 — Cloudflare Pages (фронт)
 
-1. Открой `https://soma-frontend.pages.dev` в чистом браузере (или incognito)
-2. Браузер показал prompt → введи ALPHA_KEY → зашёл в SOMA
-3. Сделай поиск — должны прийти результаты с разных источников
-4. В DevTools Network видно запросы на `soma-backend.fly.dev` с заголовком
-   `X-Alpha-Key`
+1. https://dash.cloudflare.com/sign-up — регистрация
+2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
+3. Выбираешь репо `vboriskin/soma`
+4. Settings:
+   - **Project name**: `soma-frontend`
+   - **Production branch**: `main`
+   - **Framework preset**: None
+   - **Build command**: `bash deploy/build-frontend.sh`
+   - **Build output directory**: `dist`
+5. **Save and Deploy** → через ~30 сек проект на `https://soma-frontend.pages.dev`
 
-Если что-то не работает:
-- **CORS error** в консоли → проверь `fly secrets list` — там должен быть
-  `ALLOWED_ORIGINS=https://soma-frontend.pages.dev` (или `ALLOW_PAGES_DEV=1`)
-- **401 после ввода ключа** → ключ не совпадает; в браузерном LS почисти
-  `soma.alphaKey` и введи заново
-- **Бэкенд не стартует** → `fly logs --app soma-backend`
+Открой → введи alpha-ключ → должно заработать.
 
 ---
 
-## Шаг 4 — Кастомный домен (опционально, потом)
+## Шаг 4 — Smoke-test end-to-end
 
-### 4.1 Купить домен
-Cloudflare Registrar — без накрутки, по wholesale-цене. Варианты:
-- `.app` ~$14/год
-- `.so` ~$35/год
-- `.studio` ~$22/год
-- `.design` ~$30/год
+1. https://soma-frontend.pages.dev в incognito
+2. Prompt спрашивает alpha-ключ → вставляешь свой
+3. Делаешь поиск: должны прийти результаты с разных источников
+4. DevTools Network: запросы на `94-241-174-144.nip.io` с заголовком `X-Alpha-Key`
 
-### 4.2 Привязать к Pages
-Cloudflare Pages → проект `soma-frontend` → **Custom domains** → **Set up a
-custom domain** → ввести `soma.example.com` → подтвердить (DNS-запись
-создастся автоматом если домен на Cloudflare).
+---
 
-### 4.3 Привязать к Fly
+## Раздача доступа
+
+Текущая модель — общий `ALPHA_KEY` для всех альфа-юзеров. Делишься
+сообщением вида:
+
+> Привет! SOMA в закрытой альфе. https://soma-frontend.pages.dev
+> попросит ключ — вот: `7a3f2b8d4e1c9f5a6b8d2e3f4a1b9c8d`
+
+Когда нужно отозвать всех — на сервере `nano /opt/soma/secrets.env`,
+меняешь `ALPHA_KEY=новый`, `cd /opt/soma/backend && docker compose up -d`.
+У всех старые ключи слетят, попросят ввести заново.
+
+(После альфы заменим на индивидуальные инвайт-коды + magic-link login по
+email — Этап 1 из общего плана.)
+
+---
+
+## Кастомный домен (потом)
+
+Когда купишь, скажем, `soma.app`:
+
+1. **Cloudflare Pages → Custom domains** → `soma.app` (или `app.soma.app`)
+2. **DNS на Cloudflare**: A-запись `api.soma.app → 94.241.174.144`,
+   proxy mode = DNS only (серое облако — иначе certbot не получит cert)
+3. **На сервере**:
+   ```bash
+   certbot --nginx -d api.soma.app
+   sed -i 's/94-241-174-144.nip.io/api.soma.app/g' /etc/nginx/sites-available/soma
+   systemctl reload nginx
+   ```
+4. **Во фронте** — поменять `BACKEND_URL` в `soma.html`:
+   ```js
+   return 'https://api.soma.app';
+   ```
+5. **В secrets.env** на сервере — обновить `ALLOWED_ORIGINS`:
+   ```
+   ALLOWED_ORIGINS=https://soma.app
+   ```
+   (или твой Cloudflare Pages domain если custom domain не настроил)
+6. Push → автодеплой подхватит.
+
+---
+
+## Полезные команды на сервере
+
 ```bash
-fly certs add api.soma.example.com --app soma-backend
-fly certs check api.soma.example.com --app soma-backend
+# Логи бэкенда (хвост)
+cd /opt/soma/backend && docker compose logs -f --tail 100
+
+# Перезапустить с новыми secrets.env (без билда)
+cd /opt/soma/backend && docker compose up -d
+
+# Полный пересбор + перезапуск
+cd /opt/soma/backend && docker compose up -d --build
+
+# Использование памяти/CPU
+docker stats --no-stream
+
+# Проверить cert (renewals автоматом, но проверить полезно)
+certbot certificates
+
+# Зайти внутрь контейнера
+docker exec -it soma-backend sh
+
+# Посмотреть persistent данные
+ls -la /var/lib/soma/
+
+# Откат к предыдущему коммиту (если новый деплой сломал)
+cd /opt/soma && git log --oneline | head -5
+git reset --hard <prev-sha> && bash deploy/deploy-vds.sh
 ```
-В Cloudflare DNS добавь `CNAME` запись:
-- **Name**: `api`
-- **Target**: `soma-backend.fly.dev`
-- **Proxy status**: DNS only (серое облако) — иначе fly не сможет
-  получить TLS-сертификат через ACME
-
-Подождать пока `fly certs check` покажет `✔ Issued`.
-
-### 4.4 Обновить URL'ы
-В `soma.html` поменять `BACKEND_URL` для прода:
-```js
-return 'https://api.soma.example.com';
-```
-В `backend/fly.toml`:
-```toml
-ALLOWED_ORIGINS = "https://soma.example.com"
-```
-И снять `ALLOW_PAGES_DEV=1` через `fly secrets unset ALLOW_PAGES_DEV`.
-
-Push → автодеплой обоих → готово.
-
----
-
-## Раздача инвайтов
-
-Сейчас «инвайт» = **alpha-ключ**, общий для всех альфа-юзеров. Это
-временно. План на Этап 1 (после стабилизации деплоя):
-1. SQLite + таблица `invites` с уникальными кодами
-2. Magic-link login по email через Resend
-3. Замена общего `ALPHA_KEY` на per-user сессии
-
-Пока — отправляешь друзьям сообщение типа:
-> Привет! SOMA в закрытой альфе. Зайди https://soma.example.com — попросят ключ. Вот: `7a3f2b8d4e1c9f5a6b8d2e3f4a1b9c8d`
-
-Когда будет нужно отозвать всех разом — `fly secrets set ALPHA_KEY=новый`,
-автодеплой подхватит, у всех слетит, попросят новый.
 
 ---
 
 ## Стоимость
 
-- **Cloudflare Pages**: $0 (в free tier 500 builds/мес, неограниченные
-  requests)
-- **Fly.io**: ~$5/мес (1 shared CPU, 1 ГБ RAM, 3 ГБ volume; машина может
-  гаситься при простое — `auto_stop_machines = "stop"`)
-- **Домен**: ~$1–3/мес амортизация
-- **GitHub Actions**: $0 (2000 минут/мес в free tier; деплой ~3 мин →
-  хватит на ~600 деплоев)
-
-**Итого: ~$6–8/мес**.
+| Статья | ₽/мес |
+|---|---|
+| Timeweb VDS (Amsterdam, 2GB RAM) | ~600–800 |
+| Публичный IPv4 | 180 |
+| Cloudflare Pages | 0 |
+| GitHub Actions | 0 (free tier) |
+| Let's Encrypt | 0 |
+| **Итого** | **~800 ₽/мес** |
 
 ---
 
-## Чеклист «всё готово к раздаче ключа друзьям»
+## Чек-лист «готово к раздаче ключа друзьям»
 
-- [ ] Fly app `soma-backend` отвечает на `/healthz`
-- [ ] `fly secrets list` содержит ALPHA_KEY и все API-ключи источников
-- [ ] Cloudflare Pages деплоит `dist/` без ошибок
-- [ ] Открыл pages.dev в incognito — gate спрашивает ключ — пускает
-- [ ] Поиск работает (Reddit, Wallhaven, Internet Archive — наверняка
-  отвечают, остальные опционально)
-- [ ] GitHub Actions: тестовый push в `backend/` запустил workflow и
-  завершился `success`
-- [ ] UptimeRobot пингует `/healthz` (опционально, но рекомендую)
+- [ ] `curl https://94-241-174-144.nip.io/healthz` → 200
+- [ ] `curl https://94-241-174-144.nip.io/api/info` без ключа → 401
+- [ ] `curl -H "X-Alpha-Key: <key>" https://...nip.io/api/info` → 200
+- [ ] `https://soma-frontend.pages.dev` грузится, спрашивает ключ, пускает
+- [ ] Поиск возвращает результаты хотя бы с 3 источников (Reddit,
+      Wallhaven, Internet Archive — самые надёжные)
+- [ ] GH Actions: тестовый push в `backend/` запустил workflow,
+      завершился `success`
+- [ ] (опционально) UptimeRobot пингует `/healthz`
+
+---
+
+## Troubleshooting
+
+**`certbot` не выпускает сертификат**
+- 80 порт должен быть открыт извне: `sudo ufw status` → должно быть
+  `80/tcp ALLOW`
+- DNS должен резолвить: `dig 94-241-174-144.nip.io` → 94.241.174.144
+
+**`docker compose build` падает на Playwright**
+- Проверь свободную память: `free -m`. Если меньше 1 ГБ — увеличь VDS
+  до 4 ГБ или используй remote-build (мы пока не делали).
+
+**CORS-ошибка в браузере**
+- В `secrets.env` на сервере должен быть `ALLOWED_ORIGINS=https://...pages.dev`
+  ровно с тем доменом, который грузит фронт. После правки —
+  `docker compose up -d` (рестарт).
+
+**Бэкенд `Cannot find module '/app/server.js'`**
+- В Dockerfile `COPY . .` копирует `backend/` целиком. Убедись, что
+  `git pull` отработал (`cd /opt/soma && git log -1`) и что у тебя
+  свежий код.
+
+**Контейнер всё время рестартует**
+- `docker compose logs --tail 50 backend` — смотрим почему падает.
+  Чаще всего — отсутствует обязательный env-vars (`TUMBLR_KEY` и т.п.)
+  или ALPHA_KEY пустой.
