@@ -441,8 +441,9 @@
     display: inline-block;
   }
   /* Категории-collapse: показываем первые 5, остальные скрыты по умолчанию.
-     Раскрываются по hover на «ещё ↓». Используем :nth-child + state-class. */
-  body[data-catsui="collapse"] .categories.is-collapsed > .category:nth-child(n+6),
+     Раскрываются по клику на «ещё ↓». Сдвиг nth-child(n+7) учитывает
+     row-label «раздел ·» как 1-й child — без него «ещё» тоже бы прятался. */
+  body[data-catsui="collapse"] .categories.is-collapsed > .category:nth-child(n+7),
   body[data-catsui="collapse"] .categories.is-collapsed > .cat-divider {
     display: none;
   }
