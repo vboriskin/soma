@@ -426,18 +426,21 @@
   }
   .mode-toggle .mode-opt:hover { color: var(--ink); }
   .mode-toggle .mode-opt.active { color: var(--ink); border-bottom-color: var(--ink); }
-  /* compact-mode: показывается только активный + кнопка ☰ для popover'а с другими */
+  /* Compact-mode: скрываем неактивные mode-opt'ы, показываем real-DOM
+     burger-кнопку ☰. Раскрытие — по клику (`.is-open`), не по hover —
+     hover давал flicker при наезде курсора между опциями. */
+  .mode-burger { display: none; }
   body[data-modeui="compact"] .mode-toggle .mode-opt:not(.active) { display: none; }
-  body[data-modeui="compact"] .mode-toggle::after {
-    content: "☰";
+  body[data-modeui="compact"] .mode-burger {
+    display: inline-block;
     font-size: 14px; color: var(--ink-soft); cursor: pointer;
     margin-left: 4px; padding: 4px 6px;
-    border-bottom: 0.5px solid transparent;
+    user-select: none;
     transition: color 0.2s;
   }
-  body[data-modeui="compact"] .mode-toggle:hover::after { color: var(--ink); }
-  /* hover на ☰ — показываем все три mode-opt'а через popover-style */
-  body[data-modeui="compact"] .mode-toggle:hover .mode-opt:not(.active) {
+  body[data-modeui="compact"] .mode-burger:hover { color: var(--ink); }
+  body[data-modeui="compact"] .mode-toggle.is-open .mode-burger { color: var(--ink); }
+  body[data-modeui="compact"] .mode-toggle.is-open .mode-opt:not(.active) {
     display: inline-block;
   }
   /* Категории-collapse: показываем первые 5, остальные скрыты по умолчанию.
@@ -2455,6 +2458,7 @@
       <span class="mode-opt" data-mode="artist">художник</span>
       <span class="mode-opt" data-mode="designer">дизайнер</span>
       <span class="mode-opt" data-mode="aesthetic">эстетика</span>
+      <span class="mode-burger" id="mode-burger" role="button" aria-label="показать режимы" title="показать режимы">☰</span>
     </span>
     <!-- Context zone: artist tools (artist) or stack/feed switch (designer, aesthetic) -->
     <span class="artist-tools" data-mode-section="artist" hidden>
@@ -12151,9 +12155,35 @@ function applyMode(mode, opts = {}) {
 }
 
 function setupModeToggle() {
+  const toggle = document.getElementById('mode-toggle');
   document.querySelectorAll('#mode-toggle .mode-opt').forEach(el => {
-    el.addEventListener('click', () => applyMode(el.dataset.mode));
+    el.addEventListener('click', () => {
+      applyMode(el.dataset.mode);
+      // После выбора — закрываем меню в compact-режиме.
+      toggle?.classList.remove('is-open');
+    });
   });
+  // Burger ☰ — раскрывает/прячет dropdown в compact-режиме. По клику,
+  // не на hover, чтобы не дёргалось при движении курсора.
+  const burger = document.getElementById('mode-burger');
+  if (burger && toggle) {
+    burger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggle.classList.toggle('is-open');
+    });
+    // Клик вне mode-toggle → закрываем.
+    document.addEventListener('click', (e) => {
+      if (!toggle.classList.contains('is-open')) return;
+      if (!toggle.contains(e.target)) toggle.classList.remove('is-open');
+    });
+    // Esc — тоже закрытие. Делаем capture-фазой, чтобы не конфликтовать
+    // с другими keydown-handler'ами модалок.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && toggle.classList.contains('is-open')) {
+        toggle.classList.remove('is-open');
+      }
+    });
+  }
 }
 
 // Inject hidden " dribbble" modifier for select sources in designer mode
