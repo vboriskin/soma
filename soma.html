@@ -4469,14 +4469,18 @@ const CATEGORIES_BELL = {
   ],
 };
 
-const QUERY_EXPANSIONS_BELL = {
-  'torso': ['classical', 'marble', 'renaissance'],
-  'physique': ['vintage', '1950s', 'magazine'],
-  'editorial': ['fashion', 'vogue', 'menswear'],
-  'leather': ['subculture', 'jacket', 'biker'],
-  'beach': ['summer', 'editorial', 'photography'],
-};
-const QUERY_EXPANSIONS_BELL_DEFAULT = ['vintage', 'photography', 'editorial', 'classical'];
+const QUERY_EXPANSIONS_BELL = [
+  { re: /torso|nude\s*male|male\s*figure/i,           mods: ['classical', 'marble', 'renaissance', 'sculpture', 'antique', 'study'] },
+  { re: /physique|muscle|bodybuild/i,                 mods: ['vintage', '1950s', 'magazine', 'classic', 'golden era', 'pose'] },
+  { re: /editorial|fashion|vogue|gq/i,                mods: ['menswear', 'campaign', 'monochrome', 'avedon', 'mert marcus'] },
+  { re: /leather|fetish|biker|harness/i,              mods: ['subculture', 'jacket', 'tom of finland', 'photography', 'studio'] },
+  { re: /beach|swim|pool|summer/i,                    mods: ['summer', 'editorial', 'photography', 'sun', 'horst', 'speedo'] },
+  { re: /portrait|face|head/i,                        mods: ['black and white', 'studio', 'editorial', 'classical', 'mapplethorpe'] },
+  { re: /classical|antique|greek|roman/i,             mods: ['marble', 'torso', 'museum', 'statue', 'kouros', 'apollo'] },
+  { re: /sebastian|martyr/i,                          mods: ['renaissance', 'painting', 'caravaggio', 'baroque', 'religious'] },
+  { re: /cowboy|western|marlboro/i,                   mods: ['vintage', 'editorial', 'americana', 'desert', 'ralph lauren'] },
+];
+const QUERY_EXPANSIONS_BELL_DEFAULT = ['vintage', 'photography', 'editorial', 'classical', 'monochrome'];
 
 // Дефолтный whitelist источников для bell-режима. Без музеев (met /
 // wikiart / wikimedia / iarchive / artvee / europeana), без reddit
