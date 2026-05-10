@@ -3240,23 +3240,25 @@ function formatMMSS(seconds) {
 }
 
 // ============== STATE ==============
-// Backend URL — для прода прописываем prod-домен, для localhost / file:// /
-// preview-доменов Cloudflare Pages используем `localhost:8787`. Можно
-// переопределить вручную через `?backend=...` query-param (полезно для
-// тестов на staging-инстансе).
+// Backend URL — на проде фронт и бэк на одном домене (nginx проксирует
+// /api/* и /auth/* на докер). Поэтому BACKEND_URL = '' и все fetch'и
+// получаются same-origin (никакого CORS).
+//
+// Локально разрабатываем через `file://` или `localhost` — там бэкенд
+// отдельным процессом на :8787, надо абсолютный URL.
+//
+// Override через `?backend=https://...` query-param — полезно если
+// захочется потестить локальный фронт против prod-бэка.
 const BACKEND_URL = (() => {
   const fromQuery = new URLSearchParams(location.search).get('backend');
   if (fromQuery) return fromQuery.replace(/\/$/, '');
   const host = location.hostname;
-  // Локальная разработка — всё что не https-домен.
+  // Локальная разработка
   if (!host || host === 'localhost' || host === '127.0.0.1' || location.protocol === 'file:') {
     return 'http://localhost:8787';
   }
-  // Production — живой бэкенд на VDS (Timeweb Amsterdam). nip.io резолвит
-  // `<ip-with-dashes>.nip.io` в IP сервера, поэтому домен покупать не
-  // обязательно (для альфы). Когда купим — заменим на `api.soma.example`.
-  // Cloudflare Pages preview-деплои (*.pages.dev) тоже идут сюда.
-  return 'https://94-241-174-144.nip.io';
+  // Production — same-origin. fetch('/api/info') идёт через nginx.
+  return '';
 })();
 
 // ============== Alpha-key gate (закрытая альфа) ==============
@@ -3269,7 +3271,18 @@ const BACKEND_URL = (() => {
 const ALPHA_KEY_LS = 'soma.alphaKey';
 function getAlphaKey()      { try { return localStorage.getItem(ALPHA_KEY_LS) || ''; } catch { return ''; } }
 function setAlphaKey(v)     { try { v ? localStorage.setItem(ALPHA_KEY_LS, v) : localStorage.removeItem(ALPHA_KEY_LS); } catch {} }
-function isProdBackend()    { return /^https:/.test(BACKEND_URL); }
+// Прод = HTTPS на не-localhost. Совпадает с тем, когда бэк включает
+// alphaKeyGate (через env ALPHA_KEY).
+function isProdBackend() {
+  const host = location.hostname;
+  return location.protocol === 'https:' && host && host !== 'localhost' && host !== '127.0.0.1';
+}
+// URL смотрит на наш бэкенд? На проде BACKEND_URL='' и пути вида /api/...
+// /auth/..., в деве — абсолютный http://localhost:8787/...
+function isBackendUrl(url) {
+  if (BACKEND_URL) return url.startsWith(BACKEND_URL);
+  return url.startsWith('/api/') || url.startsWith('/auth/') || url === '/healthz';
+}
 
 async function ensureAlphaKey() {
   if (!isProdBackend()) return true;
@@ -3287,7 +3300,7 @@ async function ensureAlphaKey() {
   const origFetch = window.fetch.bind(window);
   window.fetch = async function(input, init) {
     const url = typeof input === 'string' ? input : (input?.url || '');
-    const isOurBackend = url.startsWith(BACKEND_URL);
+    const isOurBackend = isBackendUrl(url);
     if (isOurBackend && isProdBackend()) {
       const key = getAlphaKey();
       if (key) {

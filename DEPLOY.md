@@ -1,24 +1,26 @@
 # SOMA — deploy guide
 
-Закрытая альфа: фронт на **Cloudflare Pages**, бэк на **Timeweb VDS
-(Amsterdam)**, автодеплой через **GitHub Actions** по SSH. Доступ закрыт
-**alpha-key**'ом.
+Закрытая альфа на одном **Timeweb VDS (Amsterdam)**: фронт и бэк на
+одном домене, nginx раздаёт статику и проксирует API. Автодеплой через
+**GitHub Actions** по SSH. Доступ закрыт **alpha-key**'ом.
+
+Без Cloudflare, без отдельного фронт-хостинга — для альфы на 5–20
+человек это лишняя сложность.
 
 ## Архитектура
 
 ```
-github.com/vboriskin/soma  ─┬─► Cloudflare Pages   ─►  https://soma-frontend.pages.dev
-                            │   (build: deploy/build-frontend.sh, output: dist)
-                            │
-                            └─► GitHub Actions ──ssh──► Timeweb VDS
-                                                        ├── docker compose: soma-backend container
-                                                        ├── nginx + Let's Encrypt
-                                                        └── /var/lib/soma → persistent
+github.com/vboriskin/soma  ──► GitHub Actions ──ssh──► Timeweb VDS
+                                                       ├── nginx :80/443
+                                                       │   ├── /                → static (/opt/soma/frontend)
+                                                       │   ├── /api/*, /auth/* → 127.0.0.1:8787
+                                                       │   └── /healthz        → 127.0.0.1:8787
+                                                       ├── docker compose → soma-backend container
+                                                       └── /var/lib/soma  → persistent
 ```
 
-Бэкенд доступен по `https://<IP-with-dashes>.nip.io` (для альфы — без
-покупки домена). Когда дойдут руки до домена — DNS-запись + 1 правка в
-nginx-конфиге + 1 правка `BACKEND_URL` во фронте.
+URL: `https://94-241-174-144.nip.io` (nip.io — wildcard DNS, без покупки
+домена). Когда купишь свой — 5 минут переключения (см. ниже).
 
 ---
 
@@ -28,32 +30,42 @@ VDS на Timeweb (`94.241.174.144`, Amsterdam, Ubuntu 24.04, 2 ГБ RAM).
 Cloud-init поставил Docker, Compose, nginx, certbot, ufw. SSH-ключ
 загружен (`~/.ssh/soma_deploy` локально, `authorized_keys` на сервере).
 
+Бэкенд развёрнут, GitHub Actions деплой работает.
+
 ---
 
-## Шаг 1 — Bootstrap сервера (один раз)
-
-На своей машине:
+## Bootstrap сервера (один раз)
 
 ```bash
 ssh -i ~/.ssh/soma_deploy root@94.241.174.144
 ```
 
-На сервере:
+На сервере, при первом разворачивании:
 
 ```bash
-# Запускаем bootstrap-скрипт прямо из репо
-curl -fsSL https://raw.githubusercontent.com/vboriskin/soma/main/deploy/bootstrap-vds.sh | bash
+# Создать SSH deploy key для приватного репо
+ssh-keygen -t ed25519 -f /root/.ssh/github_deploy -N "" -C "soma-vds-deploy"
+cat /root/.ssh/github_deploy.pub
+# Скопировать вывод → GitHub repo → Settings → Deploy keys → Add (read-only)
+
+# SSH config для github
+cat > /root/.ssh/config <<EOF
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile /root/.ssh/github_deploy
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+EOF
+chmod 600 /root/.ssh/config
+
+# Клонировать репо
+git clone git@github.com:vboriskin/soma.git /opt/soma
+
+# Запустить bootstrap (поставит nginx config, выпустит LE cert,
+# соберёт фронт, создаст пустой secrets.env)
+bash /opt/soma/deploy/bootstrap-vds.sh
 ```
-
-Скрипт:
-- клонирует репо в `/opt/soma`
-- создаёт пустой `/opt/soma/secrets.env`
-- ставит nginx-конфиг для `94-241-174-144.nip.io`
-- выпускает Let's Encrypt сертификат (HTTP challenge, ~30 сек)
-
-Если certbot ругается — проверь что 80 порт открыт извне
-(`curl http://94-241-174-144.nip.io/` с локального мака должно отдать
-nginx-страницу или ошибку).
 
 ### Заполнить секреты
 
@@ -61,25 +73,28 @@ nginx-страницу или ошибку).
 nano /opt/soma/secrets.env
 ```
 
-Скопируй из локального `backend/.env` всё нужное:
-
 ```
 ALPHA_KEY=<32 hex символа: openssl rand -hex 16>
-ALLOWED_ORIGINS=https://soma-frontend.pages.dev
-ALLOW_PAGES_DEV=1
+NODE_ENV=production
+PORT=8787
 
+# CORS не нужен — same-origin. Оставляем для совместимости.
+ALLOWED_ORIGINS=https://94-241-174-144.nip.io
+
+# API-ключи источников (значения из локального backend/.env)
 TUMBLR_KEY=...
 DA_CLIENT_ID=...
 DA_SECRET=...
 ARENA_TOKEN=...
 DRIBBBLE_CLIENT_ID=...
 DRIBBBLE_CLIENT_SECRET=...
-DRIBBBLE_COOKIE=...
+DRIBBBLE_COOKIE=
 NYPL_TOKEN=...
 OPENSEA_KEY=...
+TELEGRAM_BOT_TOKEN=...
 ```
 
-**Сохрани ALPHA_KEY где-то у себя — это будущий инвайт-код для друзей.**
+**Сохрани ALPHA_KEY у себя — это инвайт-код для друзей.**
 
 ### Первый запуск контейнера
 
@@ -88,119 +103,86 @@ cd /opt/soma/backend
 docker compose up -d --build
 ```
 
-Сборка ~4–5 минут (тащит Playwright-image ~600 МБ → ставит npm deps).
-Потом:
+Сборка ~4–5 минут (Playwright image + npm deps). Потом:
 
 ```bash
-docker compose ps               # Status: healthy ожидаем
+docker compose ps          # Status: healthy
 curl https://94-241-174-144.nip.io/healthz
 # {"ok":true,"ts":...}
 
-curl https://94-241-174-144.nip.io/api/info
-# {"error":"alpha-key required",...}    ← правильно
+curl https://94-241-174-144.nip.io/
+# <html>... (фронт)
 
-curl -H "X-Alpha-Key: <ваш_ключ>" https://94-241-174-144.nip.io/api/info
-# {"backend":...}                       ← правильно
+curl https://94-241-174-144.nip.io/api/info
+# {"error":"alpha-key required"}
+
+curl -H "X-Alpha-Key: <key>" https://94-241-174-144.nip.io/api/info
+# {"backend":...}
 ```
 
 ---
 
-## Шаг 2 — GitHub Actions secrets
-
-Чтобы push в `main` автоматически деплоил на VDS:
+## GitHub Actions автодеплой (один раз)
 
 ```bash
-# На своей машине — создаём отдельный SSH-ключ для CI
+# Локально на маке — отдельный CI-ключ
 ssh-keygen -t ed25519 -f ~/.ssh/soma_ci -N "" -C "soma-ci"
-# Кладём pub-часть на сервер
-ssh-copy-id -i ~/.ssh/soma_ci.pub root@94.241.174.144
-# Проверяем
+
+# На сервере — добавить pub в authorized_keys
+PUB=$(cat ~/.ssh/soma_ci.pub)
+ssh -i ~/.ssh/soma_deploy root@94.241.174.144 \
+  "grep -qF '$PUB' /root/.ssh/authorized_keys || echo '$PUB' >> /root/.ssh/authorized_keys"
+
+# Проверить что CI-ключ работает
 ssh -i ~/.ssh/soma_ci root@94.241.174.144 "echo ok"
-# Получаем приватный ключ для GH:
-cat ~/.ssh/soma_ci
+
+# Положить секреты в GH (нужен gh CLI)
+gh secret set VDS_HOST    --body "94.241.174.144" --repo vboriskin/soma
+gh secret set VDS_USER    --body "root"           --repo vboriskin/soma
+gh secret set VDS_SSH_KEY < ~/.ssh/soma_ci         --repo vboriskin/soma
 ```
 
-GitHub: репо → **Settings → Secrets and variables → Actions** → New
-repository secret. Создаём три секрета:
-
-| Name | Value |
-|---|---|
-| `VDS_HOST` | `94.241.174.144` |
-| `VDS_USER` | `root` |
-| `VDS_SSH_KEY` | содержимое `~/.ssh/soma_ci` (приватный ключ, **не .pub**) |
-
-Готово. Теперь `git push origin main` с правкой в `backend/` или
-`deploy/` запускает workflow (`.github/workflows/deploy-backend.yml`),
-который SSH-ит в сервер и выполняет `bash deploy/deploy-vds.sh`.
-
----
-
-## Шаг 3 — Cloudflare Pages (фронт)
-
-1. https://dash.cloudflare.com/sign-up — регистрация
-2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
-3. Выбираешь репо `vboriskin/soma`
-4. Settings:
-   - **Project name**: `soma-frontend`
-   - **Production branch**: `main`
-   - **Framework preset**: None
-   - **Build command**: `bash deploy/build-frontend.sh`
-   - **Build output directory**: `dist`
-5. **Save and Deploy** → через ~30 сек проект на `https://soma-frontend.pages.dev`
-
-Открой → введи alpha-ключ → должно заработать.
-
----
-
-## Шаг 4 — Smoke-test end-to-end
-
-1. https://soma-frontend.pages.dev в incognito
-2. Prompt спрашивает alpha-ключ → вставляешь свой
-3. Делаешь поиск: должны прийти результаты с разных источников
-4. DevTools Network: запросы на `94-241-174-144.nip.io` с заголовком `X-Alpha-Key`
+Готово. Каждый push в `main`, который меняет `backend/`, `deploy/` или
+сам workflow — запускает автодеплой через
+`.github/workflows/deploy-backend.yml`. Внутри: SSH в VDS →
+`bash /opt/soma/deploy/deploy-vds.sh` (git pull → build frontend → docker
+compose up -d).
 
 ---
 
 ## Раздача доступа
 
-Текущая модель — общий `ALPHA_KEY` для всех альфа-юзеров. Делишься
-сообщением вида:
+Делишься URL'ом и ключом:
 
-> Привет! SOMA в закрытой альфе. https://soma-frontend.pages.dev
-> попросит ключ — вот: `7a3f2b8d4e1c9f5a6b8d2e3f4a1b9c8d`
+> SOMA в закрытой альфе. https://94-241-174-144.nip.io
+> Попросит инвайт-ключ — вот: `cba2d63acb4e56d467ba8cf081801f6f`
 
-Когда нужно отозвать всех — на сервере `nano /opt/soma/secrets.env`,
-меняешь `ALPHA_KEY=новый`, `cd /opt/soma/backend && docker compose up -d`.
-У всех старые ключи слетят, попросят ввести заново.
-
-(После альфы заменим на индивидуальные инвайт-коды + magic-link login по
-email — Этап 1 из общего плана.)
+Чтобы отозвать всех разом — на сервере:
+```bash
+nano /opt/soma/secrets.env  # меняем ALPHA_KEY
+cd /opt/soma/backend && docker compose up -d
+```
+У всех старые ключи слетят, попросят ввести новый.
 
 ---
 
-## Кастомный домен (потом)
+## Кастомный домен (когда купишь)
 
-Когда купишь, скажем, `soma.app`:
-
-1. **Cloudflare Pages → Custom domains** → `soma.app` (или `app.soma.app`)
-2. **DNS на Cloudflare**: A-запись `api.soma.app → 94.241.174.144`,
-   proxy mode = DNS only (серое облако — иначе certbot не получит cert)
-3. **На сервере**:
+1. Купить домен (любой, например `soma.app` на Cloudflare Registrar)
+2. В DNS-провайдере домена: A-запись `soma.app → 94.241.174.144`
+3. На сервере:
    ```bash
-   certbot --nginx -d api.soma.app
-   sed -i 's/94-241-174-144.nip.io/api.soma.app/g' /etc/nginx/sites-available/soma
+   # Получить cert для нового домена
+   certbot --nginx -d soma.app
+   # Обновить server_name в конфиге
+   sed -i 's/94-241-174-144\.nip\.io/soma.app/g' /etc/nginx/sites-available/soma
+   sed -i 's/94-241-174-144\.nip\.io/soma.app/g' /opt/soma/deploy/bootstrap-vds.sh
    systemctl reload nginx
    ```
-4. **Во фронте** — поменять `BACKEND_URL` в `soma.html`:
-   ```js
-   return 'https://api.soma.app';
-   ```
-5. **В secrets.env** на сервере — обновить `ALLOWED_ORIGINS`:
-   ```
-   ALLOWED_ORIGINS=https://soma.app
-   ```
-   (или твой Cloudflare Pages domain если custom domain не настроил)
-6. Push → автодеплой подхватит.
+4. (Опционально) удалить старый nip.io cert: `certbot delete --cert-name 94-241-174-144.nip.io`
+
+Фронт на новом домене заработает сразу — `BACKEND_URL=''` использует
+`location.host`, никаких правок в коде.
 
 ---
 
@@ -210,25 +192,26 @@ email — Этап 1 из общего плана.)
 # Логи бэкенда (хвост)
 cd /opt/soma/backend && docker compose logs -f --tail 100
 
-# Перезапустить с новыми secrets.env (без билда)
+# Перезапустить с новым secrets.env (без билда)
 cd /opt/soma/backend && docker compose up -d
 
-# Полный пересбор + перезапуск
+# Полная пересборка
 cd /opt/soma/backend && docker compose up -d --build
 
-# Использование памяти/CPU
+# Использование ресурсов
 docker stats --no-stream
+free -m
 
-# Проверить cert (renewals автоматом, но проверить полезно)
+# Сертификаты (auto-renew работает; проверка)
 certbot certificates
 
-# Зайти внутрь контейнера
+# Зайти в контейнер
 docker exec -it soma-backend sh
 
-# Посмотреть persistent данные
-ls -la /var/lib/soma/
+# Ручной деплой (то же что делает GitHub Actions)
+bash /opt/soma/deploy/deploy-vds.sh
 
-# Откат к предыдущему коммиту (если новый деплой сломал)
+# Откат на предыдущий коммит
 cd /opt/soma && git log --oneline | head -5
 git reset --hard <prev-sha> && bash deploy/deploy-vds.sh
 ```
@@ -241,49 +224,41 @@ git reset --hard <prev-sha> && bash deploy/deploy-vds.sh
 |---|---|
 | Timeweb VDS (Amsterdam, 2GB RAM) | ~600–800 |
 | Публичный IPv4 | 180 |
-| Cloudflare Pages | 0 |
 | GitHub Actions | 0 (free tier) |
-| Let's Encrypt | 0 |
+| Let's Encrypt + nip.io | 0 |
 | **Итого** | **~800 ₽/мес** |
 
 ---
 
-## Чек-лист «готово к раздаче ключа друзьям»
+## Чек-лист «готово к раздаче ключа»
 
-- [ ] `curl https://94-241-174-144.nip.io/healthz` → 200
-- [ ] `curl https://94-241-174-144.nip.io/api/info` без ключа → 401
-- [ ] `curl -H "X-Alpha-Key: <key>" https://...nip.io/api/info` → 200
-- [ ] `https://soma-frontend.pages.dev` грузится, спрашивает ключ, пускает
-- [ ] Поиск возвращает результаты хотя бы с 3 источников (Reddit,
-      Wallhaven, Internet Archive — самые надёжные)
-- [ ] GH Actions: тестовый push в `backend/` запустил workflow,
-      завершился `success`
-- [ ] (опционально) UptimeRobot пингует `/healthz`
+- [x] `https://94-241-174-144.nip.io/healthz` → 200
+- [x] `https://94-241-174-144.nip.io/api/info` без ключа → 401
+- [x] `https://94-241-174-144.nip.io/api/info` с ключом → 200
+- [ ] `https://94-241-174-144.nip.io/` грузит SOMA, prompt спрашивает ключ
+- [ ] Поиск возвращает результаты с 3+ источников
+- [x] GH Actions: `workflow_dispatch` → `success`
 
 ---
 
 ## Troubleshooting
 
-**`certbot` не выпускает сертификат**
-- 80 порт должен быть открыт извне: `sudo ufw status` → должно быть
-  `80/tcp ALLOW`
-- DNS должен резолвить: `dig 94-241-174-144.nip.io` → 94.241.174.144
-
 **`docker compose build` падает на Playwright**
-- Проверь свободную память: `free -m`. Если меньше 1 ГБ — увеличь VDS
-  до 4 ГБ или используй remote-build (мы пока не делали).
-
-**CORS-ошибка в браузере**
-- В `secrets.env` на сервере должен быть `ALLOWED_ORIGINS=https://...pages.dev`
-  ровно с тем доменом, который грузит фронт. После правки —
-  `docker compose up -d` (рестарт).
-
-**Бэкенд `Cannot find module '/app/server.js'`**
-- В Dockerfile `COPY . .` копирует `backend/` целиком. Убедись, что
-  `git pull` отработал (`cd /opt/soma && git log -1`) и что у тебя
-  свежий код.
+- Проверь `free -m`. Если меньше 1 ГБ — апгрейдь VDS до 4 ГБ.
 
 **Контейнер всё время рестартует**
-- `docker compose logs --tail 50 backend` — смотрим почему падает.
-  Чаще всего — отсутствует обязательный env-vars (`TUMBLR_KEY` и т.п.)
-  или ALPHA_KEY пустой.
+- `docker compose logs --tail 50 backend`
+- Чаще всего — пустой `ALPHA_KEY` в `secrets.env` или отсутствие нужного
+  API-ключа.
+
+**Cert не обновляется**
+- `certbot renew --dry-run` — проверка
+- Cron-таск стоит автоматом (`/etc/cron.d/certbot`)
+
+**После правки nginx config в репе ничего не изменилось**
+- Deploy script не трогает nginx config (хрупко из-за certbot).
+- Применить: `ssh root@server 'bash /opt/soma/deploy/bootstrap-vds.sh'`
+
+**`502 Bad Gateway`**
+- Бэкенд не отвечает на 8787. Проверить контейнер:
+  `cd /opt/soma/backend && docker compose ps`

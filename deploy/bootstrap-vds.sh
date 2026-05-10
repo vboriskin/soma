@@ -59,6 +59,12 @@ EOF
   log "WARN: /opt/soma/secrets.env пустой — заполни его перед первым запуском"
 fi
 
+# ----- 2.5. Сборка статики фронта -----
+log "building frontend → /opt/soma/frontend"
+bash "$APP_DIR/deploy/build-frontend.sh"
+mkdir -p /opt/soma/frontend
+rsync -a --delete "$APP_DIR/dist/" /opt/soma/frontend/
+
 # ----- 3. Nginx конфиг -----
 NGINX_LINK=/etc/nginx/sites-enabled/soma
 NGINX_CONF=/etc/nginx/sites-available/soma
@@ -73,7 +79,11 @@ systemctl reload nginx
 
 # ----- 4. Let's Encrypt -----
 if [ -d "/etc/letsencrypt/live/$HOSTNAME_NIP" ]; then
-  log "LE cert already exists for $HOSTNAME_NIP"
+  # Cert уже есть — но мы только что переписали nginx-config (выше), и его
+  # 443-server-block потерялся. Просим certbot переинсталлировать cert в
+  # свежий config (это добавит ssl_*, listen 443, redirect 80→443).
+  log "LE cert exists — reinstalling into fresh nginx config"
+  certbot install --cert-name "$HOSTNAME_NIP" --nginx --redirect --non-interactive
 else
   log "issuing Let's Encrypt cert for $HOSTNAME_NIP"
   CERTBOT_ARGS=(--nginx -d "$HOSTNAME_NIP" --non-interactive --agree-tos --redirect)
