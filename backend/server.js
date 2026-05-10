@@ -45,22 +45,32 @@ app.get('/healthz', (_req, res) => {
 });
 
 // ============== Alpha-key gate (закрытая альфа) ==============
-// Пока нет нормальных аккаунтов — закрываем API одним общим ключом.
-// Ключ приходит из env ALPHA_KEY. Если не задан — гейт выключен (дев/локал).
+// Пока нет нормальных аккаунтов — закрываем API alpha-ключами.
+// `ALPHA_KEY` принимает список ключей через запятую — любой валидный
+// пропускает. `BELL_KEY` — отдельный «invite-tier» ключ, тоже должен
+// присутствовать в ALPHA_KEY (он же должен пускать вообще). Если юзер
+// зашёл по BELL_KEY — /api/info вернёт ему capability `bell:true` и
+// фронт покажет скрытый режим.
 //
-// Фронт хранит ключ в localStorage и шлёт в header `X-Alpha-Key`. Также
-// принимаем `?alpha=...` (для curl-тестов) и cookie `soma_alpha` (на будущее).
-//
-// `/healthz` и `/` остаются открытыми. Используем кастомный header вместо
-// Basic Auth — чтобы не дёргать нативный browser-prompt и не возиться с
-// `credentials: include` на 30+ fetch'ах.
+// /healthz и / остаются открытыми. Кастомный header вместо Basic Auth —
+// проще для SPA (не нужен `credentials: include` на 30+ fetch'ах).
+function getValidAlphaKeys() {
+  const raw = process.env.ALPHA_KEY || '';
+  return raw.split(',').map(k => k.trim()).filter(Boolean);
+}
+function getBellKey() {
+  return (process.env.BELL_KEY || '').trim() || null;
+}
 function alphaKeyGate(req, res, next) {
-  const expected = process.env.ALPHA_KEY;
-  if (!expected) return next();
+  const valid = getValidAlphaKeys();
+  if (!valid.length) return next();   // гейт выключен (дев)
   const got = req.headers['x-alpha-key']
            || req.query?.alpha
            || (req.headers.cookie || '').match(/(?:^|;\s*)soma_alpha=([^;]+)/)?.[1];
-  if (got === expected) return next();
+  if (valid.includes(got)) {
+    req.alphaKey = got;   // downstream: /api/info использует для capability-check
+    return next();
+  }
   res.status(401).json({ error: 'alpha-key required', hint: 'set X-Alpha-Key header' });
 }
 

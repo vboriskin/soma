@@ -105,7 +105,13 @@ const handlers = {
 
 // Backend metadata for the diagnostics screen. Reports versions and which
 // secrets are present — boolean flags only, never values.
-router.get('/info', (_req, res) => {
+router.get('/info', (req, res) => {
+  // Capability `bell`: true если юзер зашёл с BELL_KEY (отдельный
+  // pro-tier ключ). Фронт скрывает соответствующий режим без него.
+  const bellKey = (process.env.BELL_KEY || '').trim();
+  const capabilities = {
+    bell: !!bellKey && req.alphaKey === bellKey,
+  };
   res.json({
     backend: {
       name: 'soma backend',
@@ -124,6 +130,7 @@ router.get('/info', (_req, res) => {
       NYPL_TOKEN:             !!process.env.NYPL_TOKEN,
       OPENSEA_KEY:            !!process.env.OPENSEA_KEY,
     },
+    capabilities,
   });
 });
 

@@ -2458,6 +2458,9 @@
       <span class="mode-opt" data-mode="artist">художник</span>
       <span class="mode-opt" data-mode="designer">дизайнер</span>
       <span class="mode-opt" data-mode="aesthetic">эстетика</span>
+      <!-- Скрытый режим: доступен только держателям BELL_KEY И включённый
+           в настройках. renderModeToggle() снимает hidden когда оба true. -->
+      <span class="mode-opt" data-mode="bell" hidden>липкий бубенец</span>
       <span class="mode-burger" id="mode-burger" role="button" aria-label="показать режимы" title="показать режимы">☰</span>
     </span>
     <!-- Context zone: artist tools (artist) or stack/feed switch (designer, aesthetic) -->
@@ -2840,6 +2843,19 @@
             <button class="text-link" data-ritual-mode="always">при каждом открытии</button>
           </div>
           <p class="help" style="margin-top: 10px; font-style: italic;">повторить ритуал · <span style="font-family: monospace;">⌘⇧R</span> (Mac) / <span style="font-family: monospace;">Ctrl+Shift+R</span></p>
+        </div>
+
+        <!-- Скрытые режимы — секция появляется только если бэкенд подтвердил
+             capability через /api/info. Без BELL_KEY юзер не увидит даже
+             заголовок. -->
+        <div class="field" id="bell-section" hidden>
+          <hr class="sep" style="margin: 24px 0;">
+          <label style="display: block; font-size: 9px; color: var(--ink-mid); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.18em;">скрытые режимы</label>
+          <p class="help" style="margin-bottom: 10px;">режим «<em>липкий бубенец</em>» — мужская эстетика: от классических торсов до vintage-physique и tom of finland. в общем переключателе скрыт по умолчанию.</p>
+          <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
+            <button class="text-link" id="bell-toggle-off">выкл</button>
+            <button class="text-link" id="bell-toggle-on">включить</button>
+          </div>
         </div>
 
       </div>
@@ -3548,6 +3564,14 @@ const MODES = {
     // Curated set leaning toward editorial / Cereal-Apartamento sensibility,
     // away from r/CozyPlaces / r/MostBeautiful Pinterest-tier defaults.
     defaultSubs:  ['MostBeautiful','AccidentalRenaissance','AbandonedPorn','CityPorn','VillagePorn','MovieDetails','ArtefactPorn','ImaginaryArchitecture','BookPorn','DesignPorn'],
+  },
+  // Скрытый режим — доступен только держателям BELL_KEY (capability bell:true
+  // из /api/info). По умолчанию не виден в mode-toggle. Sub-list пустой —
+  // источник Reddit для этого режима выключен (см. enabledSourcesByMode.bell).
+  bell: {
+    defaultQuery: '',
+    placeholder:  'мужская эстетика…',
+    defaultSubs:  [],
   },
 };
 
@@ -4344,6 +4368,134 @@ const SURPRISE_QUERIES = [
   'tiny things beautiful',
 ];
 
+// ============== CATEGORIES — bell (скрытый режим) ==============
+// Тэги без слов «naked / голый / nude» — иначе мусор и риск NSFW-проскоков.
+// SFW-фильтры на источниках остаются включёнными; museum-источники сюда
+// не подключаем (см. enabledSourcesByMode.bell).
+const CATEGORIES_BELL = {
+  'античность': [
+    { label: 'classical torso', q: 'classical greek torso' },
+    { label: 'roman marble', q: 'roman marble bust' },
+    { label: 'antinous', q: 'antinous portrait' },
+    { label: 'saint sebastian', q: 'saint sebastian painting' },
+    { label: 'david michelangelo', q: 'david michelangelo' },
+    { label: 'apollo belvedere', q: 'apollo belvedere' },
+    { label: 'kouros', q: 'kouros sculpture' },
+  ],
+  'ренессанс и барокко': [
+    { label: 'caravaggio bacchus', q: 'caravaggio bacchus' },
+    { label: 'renaissance male', q: 'renaissance male portrait' },
+    { label: 'baroque hercules', q: 'baroque hercules' },
+    { label: 'italian baroque', q: 'italian baroque torso' },
+    { label: 'apollo classical', q: 'classical apollo painting' },
+  ],
+  'vintage physique': [
+    { label: 'physique magazine', q: 'vintage physique magazine' },
+    { label: 'bob mizer', q: 'bob mizer photography' },
+    { label: 'athletic model guild', q: 'athletic model guild' },
+    { label: '1950s muscle', q: '1950s physique culture' },
+    { label: 'eugene sandow', q: 'eugene sandow' },
+    { label: 'physical culture', q: 'physical culture magazine' },
+  ],
+  'tom of finland': [
+    { label: 'tom of finland', q: 'tom of finland' },
+    { label: 'finland prints', q: 'tom of finland prints' },
+    { label: 'leather illustration', q: 'leather masculinity illustration' },
+    { label: 'touko laaksonen', q: 'touko laaksonen' },
+  ],
+  'mapplethorpe эра': [
+    { label: 'mapplethorpe', q: 'robert mapplethorpe photography' },
+    { label: 'bruce weber', q: 'bruce weber photography' },
+    { label: 'herb ritts', q: 'herb ritts photography' },
+    { label: 'classical photography', q: 'classical photography male' },
+    { label: 'ck vintage', q: 'calvin klein vintage ad' },
+    { label: 'ck obsession', q: 'ck obsession campaign' },
+  ],
+  'editorial': [
+    { label: 'menswear editorial', q: 'menswear editorial' },
+    { label: 'mens fashion', q: 'mens fashion photography' },
+    { label: 'ck campaign', q: 'calvin klein campaign' },
+    { label: 'prada mens', q: 'prada mens editorial' },
+    { label: 'gq portrait', q: 'gq portrait' },
+    { label: 'glamour male', q: 'glamour male editorial' },
+  ],
+  'бодибилдинг': [
+    { label: 'bodybuilding silhouette', q: 'bodybuilding silhouette' },
+    { label: 'classic physique', q: 'classic mens physique' },
+    { label: 'arnold black white', q: 'arnold schwarzenegger black white' },
+    { label: 'golden era', q: 'golden era bodybuilding' },
+    { label: 'posing photography', q: 'bodybuilding posing photography' },
+    { label: 'oiled physique', q: 'oiled physique sculpture' },
+  ],
+  'бокс и борьба': [
+    { label: 'boxing photography', q: 'boxing photography black white' },
+    { label: 'wrestling vintage', q: 'wrestling vintage' },
+    { label: 'strongman pose', q: 'strongman pose' },
+    { label: 'fight portrait', q: 'fight portrait' },
+  ],
+  'кожа и латекс': [
+    { label: 'leather subculture', q: 'leather subculture photography' },
+    { label: 'fetish editorial', q: 'fetish editorial vogue' },
+    { label: 'motorcycle club', q: 'motorcycle club aesthetic' },
+    { label: 'biker portrait', q: 'biker portrait' },
+    { label: 'leather jacket', q: 'leather jacket portrait' },
+  ],
+  'влажное': [
+    { label: 'wet portrait', q: 'wet portrait male' },
+    { label: 'swimming pool', q: 'swimming pool photography mens' },
+    { label: 'beach editorial', q: 'beach editorial men' },
+    { label: 'summer male', q: 'summer male photography' },
+    { label: 'glistening skin', q: 'glistening skin art' },
+  ],
+  'фронтир': [
+    { label: 'marlboro man', q: 'marlboro man advertising' },
+    { label: 'american western', q: 'american western men' },
+    { label: 'cowboy vintage', q: 'cowboy photography vintage' },
+    { label: 'ralph lauren cowboy', q: 'ralph lauren cowboy' },
+    { label: 'western masculinity', q: 'western masculinity' },
+  ],
+  'спорт и быт': [
+    { label: 'locker room', q: 'locker room aesthetic' },
+    { label: 'gym vintage', q: 'gym photography vintage' },
+    { label: 'athletic training', q: 'athletic training black white' },
+    { label: 'after game', q: 'after the game photography' },
+  ],
+  'queer и прайд': [
+    { label: 'queer photography', q: 'queer photography' },
+    { label: 'gay liberation', q: 'gay liberation 1970s' },
+    { label: 'pride aesthetic', q: 'pride aesthetic' },
+    { label: 'queer art history', q: 'queer art history' },
+    { label: 'david wojnarowicz', q: 'david wojnarowicz' },
+  ],
+};
+
+const QUERY_EXPANSIONS_BELL = {
+  'torso': ['classical', 'marble', 'renaissance'],
+  'physique': ['vintage', '1950s', 'magazine'],
+  'editorial': ['fashion', 'vogue', 'menswear'],
+  'leather': ['subculture', 'jacket', 'biker'],
+  'beach': ['summer', 'editorial', 'photography'],
+};
+const QUERY_EXPANSIONS_BELL_DEFAULT = ['vintage', 'photography', 'editorial', 'classical'];
+
+// Дефолтный whitelist источников для bell-режима. Без музеев (met /
+// wikiart / wikimedia / iarchive / artvee / europeana), без reddit
+// (без курированных сабов он непредсказуем). Pinterest / wallhaven
+// остаются с включёнными SFW-фильтрами на их стороне.
+const BELL_ENABLED_SOURCES = new Set([
+  'tumblr',
+  'flickr',
+  'nypl',
+  'artstation',
+  'deviantart',
+  'arena', 'arena-tags',
+  'wallhaven',
+  'unsplash', 'pexels', 'pixabay',
+  'pinterest',
+  'bluesky-firehose',
+  'opensea',
+]);
+
 // Active categories dictionary, swapped on mode change
 let CATEGORIES = CATEGORIES_ARTIST;
 
@@ -4406,13 +4558,14 @@ function expandQuery(q) {
 const state = {
   keys: {},                 // {unsplash: '...', ...}
   enabledSources: {},       // mirror of enabledSourcesByMode[currentMode]
-  enabledSourcesByMode: { artist: {}, designer: {}, aesthetic: {} },
+  enabledSourcesByMode: { artist: {}, designer: {}, aesthetic: {}, bell: {} },
   mode: 'artist',           // 'artist' | 'designer'
   subreddits: [],           // current mode's subs (mirror of subsByMode[mode])
   subsByMode: {             // separated lists per mode
     artist: [],
     designer: [],
     aesthetic: [],
+    bell: [],               // reddit для bell-режима не используем
   },
   queue: [],                // {url, thumb, source, author, authorUrl, pageUrl, id}
   current: null,
@@ -4462,7 +4615,7 @@ const state = {
   // Seen-tracking — soft anti-repeat. Map(itemId → ts).
   // 1.1.7: per-mode seenIds, чтобы 5000 свайпов в эстетике не давили на
   // anti-repeat в дизайнере. seenIds = Map текущего mode (mirror).
-  seenIdsByMode: { artist: new Map(), designer: new Map(), aesthetic: new Map() },
+  seenIdsByMode: { artist: new Map(), designer: new Map(), aesthetic: new Map(), bell: new Map() },
   seenIds: new Map(),
   feedLoading: false,
   feedError: null,
@@ -4497,6 +4650,13 @@ const state = {
   // мутации (add/remove). Если бэк недоступен — пустые списки, фильтрация
   // на бэке всё равно отработает при следующем search.
   blocklist: { images: [], authors: [], sources: [] },
+  // ---- Bell mode (скрытый режим, требует BELL_KEY) ----
+  // bellAvailable: capability с backend'а — есть ли у юзера право
+  // показать тоггл. Проставляется после /api/info.
+  // bellEnabled: пользовательское решение из настроек — хочет ли он
+  // видеть режим в mode-toggle. LS-перси́стенс.
+  bellAvailable: false,
+  bellEnabled: false,
   // ---- Per-category «скрытое» (local, через localStorage) ----
   // Кнопка «скрыть» из карточки кладёт элемент СЮДА (в текущий раздел),
   // а не в глобальный blocklist выше. Если юзер потом перейдёт в другой
@@ -10466,6 +10626,9 @@ bind('settings-btn', () => {
   set('key-flickr', state.keys.flickr || '');
   set('key-smithsonian', state.keys.smithsonian || '');
   ['key-unsplash', 'key-pexels', 'key-pixabay', 'key-flickr', 'key-smithsonian'].forEach(applySecretMasking);
+  // Скрытый bell-режим: при открытии настроек обновим состояние
+  // toggle'а. Capability подтягивается в loadBackendInfo (вызывается из init).
+  renderBellToggle();
   renderSubsList();
   renderPaywallCookies();
   loadTelegramInfo().then(() => renderTelegramSection());
@@ -11108,8 +11271,17 @@ function isSourceConnected(src) {
 }
 
 function loadBackendInfo() {
-  fetch(`${BACKEND_URL}/api/info`).then(r => r.json()).then(info => {
+  return fetch(`${BACKEND_URL}/api/info`).then(r => r.json()).then(info => {
     diagBackendInfo = info;
+    // Capability: bell-режим доступен только держателям BELL_KEY.
+    const wasAvailable = state.bellAvailable;
+    state.bellAvailable = !!(info && info.capabilities && info.capabilities.bell);
+    // Если capability только что появилась — даём фронту обновить
+    // mode-toggle и settings (например, юзер только что ввёл новый ключ).
+    if (state.bellAvailable !== wasAvailable) {
+      if (typeof renderModeToggle === 'function') renderModeToggle();
+      if (typeof renderBellToggle === 'function') renderBellToggle();
+    }
     if (document.getElementById('diag-modal').classList.contains('show')) renderDiag();
   }).catch(() => {});
 }
@@ -12345,7 +12517,10 @@ function applyVisibility() {
 }
 
 function applyMode(mode, opts = {}) {
-  if (mode !== 'artist' && mode !== 'designer' && mode !== 'aesthetic') mode = 'artist';
+  if (mode !== 'artist' && mode !== 'designer' && mode !== 'aesthetic' && mode !== 'bell') mode = 'artist';
+  // Guard: bell доступен только если capability подтвердил backend
+  // (или юзер на localhost). Иначе фолбэк на aesthetic.
+  if (mode === 'bell' && !state.bellAvailable) mode = 'aesthetic';
   const previous = state.mode;
   state.mode = mode;
   try { localStorage.setItem('rs:mode', mode); } catch(e) {}
@@ -12357,22 +12532,30 @@ function applyMode(mode, opts = {}) {
   // Swap content dictionaries
   CATEGORIES = mode === 'designer' ? CATEGORIES_DESIGNER
              : mode === 'aesthetic' ? CATEGORIES_AESTHETIC
+             : mode === 'bell' ? CATEGORIES_BELL
              : CATEGORIES_ARTIST;
   QUERY_EXPANSIONS = mode === 'designer' ? QUERY_EXPANSIONS_DESIGNER
                   : mode === 'aesthetic' ? QUERY_EXPANSIONS_AESTHETIC
+                  : mode === 'bell' ? QUERY_EXPANSIONS_BELL
                   : QUERY_EXPANSIONS_ARTIST;
   QUERY_EXPANSIONS_DEFAULT = mode === 'designer' ? QUERY_EXPANSIONS_DESIGNER_DEFAULT
                           : mode === 'aesthetic' ? QUERY_EXPANSIONS_AESTHETIC_DEFAULT
+                          : mode === 'bell' ? QUERY_EXPANSIONS_BELL_DEFAULT
                           : QUERY_EXPANSIONS_ARTIST_DEFAULT;
 
   // Per-mode subs (mirror into visible list)
   state.subreddits = state.subsByMode[mode] || [];
   // Per-mode enabledSources — switch reference to the new mode's map. Backfill
-  // any newly-introduced sources with their defaults for this mode.
+  // any newly-introduced sources с их дефолтами для этого режима.
   if (!state.enabledSourcesByMode[mode]) state.enabledSourcesByMode[mode] = {};
   const map = state.enabledSourcesByMode[mode];
   SOURCES.forEach(s => {
     if (map[s.id] !== undefined) return;
+    // Bell-режим: только курированный список (без музеев, без reddit).
+    if (mode === 'bell') {
+      map[s.id] = BELL_ENABLED_SOURCES.has(s.id) && (!s.needsKey || !!state.keys[s.id]);
+      return;
+    }
     const off = (typeof s.defaultOff === 'object' && s.defaultOff !== null)
       ? !!s.defaultOff[mode]
       : !!s.defaultOff;
@@ -12424,7 +12607,8 @@ function applyMode(mode, opts = {}) {
   // применяем его, иначе остаёмся в текущем. Artist всегда в stack
   // (feed для него не реализован).
   let targetView = state.view;
-  if (mode === 'artist') {
+  if (mode === 'artist' || mode === 'bell') {
+    // Bell — только stack (feed-сорсы не курированы под мужскую эстетику).
     targetView = 'stack';
   } else {
     try {
@@ -12460,6 +12644,51 @@ function applyMode(mode, opts = {}) {
   } else if (typeof renderTodayBlock === 'function') {
     renderTodayBlock();
   }
+}
+
+// Скрытый bell-режим: визуально появляется в mode-toggle только если
+// capability с бэка == true И юзер сам включил в настройках.
+function renderModeToggle() {
+  const el = document.querySelector('#mode-toggle .mode-opt[data-mode="bell"]');
+  if (!el) return;
+  el.hidden = !(state.bellAvailable && state.bellEnabled);
+  // Подсветка active — если мы СЕЙЧАС в этом режиме.
+  el.classList.toggle('active', state.mode === 'bell');
+}
+
+// Settings → окружение → секция «скрытые режимы». Видна только при
+// state.bellAvailable=true. Кнопки выкл/включить переключают bellEnabled.
+function renderBellToggle() {
+  const section = document.getElementById('bell-section');
+  if (!section) return;
+  section.hidden = !state.bellAvailable;
+  if (!state.bellAvailable) return;
+  const offBtn = document.getElementById('bell-toggle-off');
+  const onBtn  = document.getElementById('bell-toggle-on');
+  if (offBtn) offBtn.classList.toggle('active', !state.bellEnabled);
+  if (onBtn)  onBtn.classList.toggle('active',  state.bellEnabled);
+}
+
+function setBellEnabled(v) {
+  state.bellEnabled = !!v;
+  try { localStorage.setItem('rs:bellEnabled', state.bellEnabled ? '1' : '0'); } catch (e) {}
+  renderModeToggle();
+  renderBellToggle();
+  // Если юзер выключил режим в момент когда был в нём — фолбэк на эстетику.
+  if (!state.bellEnabled && state.mode === 'bell') {
+    applyMode('aesthetic', { resetQuery: true });
+  }
+}
+
+function setupBellToggle() {
+  const off = document.getElementById('bell-toggle-off');
+  const on  = document.getElementById('bell-toggle-on');
+  if (off) off.addEventListener('click', () => setBellEnabled(false));
+  if (on)  on.addEventListener('click',  () => setBellEnabled(true));
+  // Подтянем сохранённое значение из LS
+  try {
+    state.bellEnabled = localStorage.getItem('rs:bellEnabled') === '1';
+  } catch (e) {}
 }
 
 function setupModeToggle() {
@@ -13261,6 +13490,15 @@ window.setRitualMode = function (mode) {
     }
     loadState();
     setupModeToggle();
+    setupBellToggle();        // подтягивает state.bellEnabled из LS
+    // Capability bell — спрашиваем у бэка ДО applyMode, чтобы guard в нём
+    // отработал корректно (если в LS сохранён mode='bell' но capability false →
+    // фолбэк на aesthetic). Ждём с разумным таймаутом — иначе init встанет
+    // если бэк лёг.
+    await Promise.race([
+      loadBackendInfo(),
+      new Promise(r => setTimeout(r, 800)),
+    ]);
     setupDribbbleSection();
     setupFeed();
     setupLevelRow();
