@@ -5307,7 +5307,7 @@ function onPresetChange() {
     } else if (typeof search === 'function') {
       // Не дёргаем поиск при пустом query — иначе после смены раздела
       // без введённого запроса полетят «missing q» на 5+ источников.
-      if (state.query) search(state.query);
+      if (state.query) search(state.query, false, { trigger: 'preset-change' });
       else if (typeof renderCard === 'function') renderCard();
     }
   }, 200);
@@ -7700,7 +7700,7 @@ function renderCard() {
         const newQ = el.dataset.q;
         const inp = document.getElementById('query');
         if (inp) inp.value = newQ;
-        search(newQ);
+        search(newQ, false, { trigger: 'empty-suggestion' });
       });
     });
     stack.querySelectorAll('.empty-tip[data-action="search"]').forEach(el => {
@@ -7708,7 +7708,7 @@ function renderCard() {
         const newQ = el.dataset.q;
         const inp = document.getElementById('query');
         if (inp) inp.value = newQ;
-        search(newQ);
+        search(newQ, false, { trigger: 'empty-tip' });
       });
     });
     state.current = null;
@@ -8178,7 +8178,56 @@ function updateLikedBadge() {
 }
 
 // ============== SEARCH ==============
-async function search(query, append = false) {
+// Снимок «что мы шлём» — для history-события 'search'. Собирает trigger,
+// активные хинты, список таргет-источников, режимные оси. Используется
+// для подробных action-логов в подвкладке истории.
+function buildSearchContext(query, opts = {}) {
+  const ctx = {
+    query,
+    trigger: opts.trigger || 'manual',
+    tag: opts.tag || null,
+    category: (typeof activeCategory !== 'undefined' ? activeCategory : null),
+    mode: state.mode,
+    view: state.view,
+  };
+  // Режимные оси.
+  if (state.mode === 'artist')     ctx.artistLevel = state.artistLevel || 'all';
+  if (state.mode === 'designer')   { ctx.platform = state.designerPlatform || 'all'; ctx.domain = state.designerDomain || 'all'; }
+  if (state.mode === 'aesthetic')  ctx.theme = state.aestheticTheme || 'all';
+  // Активные хинты (те что эффективно навешиваются в effectiveQueryFor).
+  const hints = {};
+  if (state.mode === 'artist' && ARTIST_LEVEL_HINTS[state.artistLevel]) {
+    hints.level = ARTIST_LEVEL_HINTS[state.artistLevel];
+  }
+  if (state.mode === 'designer') {
+    const ch = DESIGNER_CATEGORY_HINTS[activeCategory];
+    if (ch) hints.category = ch;
+    if (ctx.platform && ctx.platform !== 'all') hints.platform = ctx.platform;
+    if (ctx.domain   && ctx.domain   !== 'all') hints.domain   = ctx.domain;
+  }
+  if (state.mode === 'aesthetic') {
+    const ch = AESTHETIC_CATEGORY_HINTS[activeCategory];
+    if (ch) hints.category = ch;
+  }
+  if (Object.keys(hints).length) ctx.hints = hints;
+  // Целевые источники (после всех фильтров — pres-binding, blocklist,
+  // enabledSourcesByMode). Это и есть финальный список fetchers'ов.
+  try {
+    const ids = (typeof getActiveSourceIds === 'function') ? getActiveSourceIds() : [];
+    if (ids && ids.length) ctx.sources = ids;
+  } catch (e) {}
+  // Pre-snapshot активного пресета — пригодится для отчётов.
+  try {
+    const pid = state.activeCustomPreset?.[state.mode];
+    if (pid) {
+      const p = state.customPresets?.find(x => x.id === pid);
+      ctx.preset = p ? p.label : pid;
+    }
+  } catch (e) {}
+  return ctx;
+}
+
+async function search(query, append = false, opts = {}) {
   // Пустой запрос — НЕ дёргаем бэкенд (5 источников вернут «missing q»),
   // НЕ пишем в history. Просто очищаем стек и показываем idle empty-state.
   // Это срабатывает после mode-switch + клика по категории (см. п.4).
@@ -8192,6 +8241,8 @@ async function search(query, append = false) {
     return;
   }
   state.query = query;
+  // Сразу засекаем когда начался поиск — durationMs пойдёт в search_result.
+  const _searchStartedAt = Date.now();
   if (!append) {
     state.loading = true;
     state.queue = [];
@@ -8201,7 +8252,9 @@ async function search(query, append = false) {
     // текущим query — кликнул чип, ввёл руками или сменил тег, всё
     // одинаково обновляется.
     if (typeof renderPresets === 'function') renderPresets();
-    historyLog('search', { query });
+    // Подробное событие действия: trigger, тег, раздел, режим, хинты,
+    // целевые источники. См. buildSearchContext.
+    historyLog('search', buildSearchContext(query, opts));
     // Quality metrics: общий счётчик + отдельный для cyrillic-запросов
     // (cyrillic-empty rate — ключевая метрика multilingual-проблемы).
     state.metrics.searches++;
@@ -8287,6 +8340,32 @@ async function search(query, append = false) {
     }
     state.loading = false;
     renderCard();
+    // Подробный отчёт о результате: per-source counts/errors, skipped,
+    // duration. Только для non-append (рефилл — служебный).
+    if (!append) {
+      try {
+        const perSource = {};
+        for (const it of (items || [])) {
+          const s = it && it.source;
+          if (!s) continue;
+          (perSource[s] = perSource[s] || { count: 0 }).count++;
+        }
+        for (const e of (errors || [])) {
+          const s = e && e.source;
+          if (!s) continue;
+          (perSource[s] = perSource[s] || { count: 0 }).error = e.message || String(e);
+        }
+        historyLog('search_result', {
+          query,
+          total: items?.length || 0,
+          sources: perSource,
+          skippedCyrillic: (skippedDueToCyrillic || []).map(s => s.id || s),
+          skippedHealth:   (skippedDueToHealth   || []).map(s => s.id || s),
+          fallbackUsed: !!state._fallbackUsed,
+          durationMs: Date.now() - _searchStartedAt,
+        });
+      } catch (e) { /* logging shouldn't kill UX */ }
+    }
     // Toast: если фолбэк сработал и реально дал прирост — показать subtle hint
     // под полем ввода, что мы расширили запрос.
     if (!append && state._fallbackUsed && state._fallbackInfo && items.length > 0) {
@@ -9288,9 +9367,9 @@ function bind(id, handler, event = 'onclick') {
   if (el) el[event] = handler;
 }
 
-const doSearch = () => {
+const doSearch = (opts = {}) => {
   const q = document.getElementById('query').value.trim();
-  if (q) search(q);
+  if (q) search(q, false, { trigger: 'manual', ...opts });
 };
 bind('search-btn', doSearch);
 bind('query', (e) => {
@@ -9355,6 +9434,9 @@ function renderCategories() {
     el.textContent = name;
     el.onclick = () => {
       activeCategory = name;
+      // Записываем сам факт клика по разделу — даже если он не порождает
+      // поиск (пустой query), это всё равно действие пользователя.
+      historyLog('category_change', { category: name, mode: state.mode });
       renderCategories();
       renderPresets();
       // Категория — также ось пресета (низший приоритет в getActivePresetId).
@@ -9428,6 +9510,7 @@ function renderPresets() {
       if (isActive) {
         // Повторный клик по активному тегу — снимаем (toggle off).
         // Очищаем поле и стек, никакого нового поиска не дёргаем.
+        historyLog('tag_untoggle', { tag: item.label, q: item.q, category: activeCategory });
         if (inp) inp.value = '';
         state.query = '';
         state.queue = [];
@@ -9436,7 +9519,8 @@ function renderPresets() {
         renderExpansion();
       } else {
         if (inp) inp.value = item.q;
-        search(item.q);
+        // Передаём контекст: trigger=tag-click, label тега.
+        search(item.q, false, { trigger: 'tag-click', tag: item.label });
         // Подсветим этот тег сразу — пока search не дёрнул re-render.
         renderPresets();
       }
@@ -9475,7 +9559,7 @@ function renderExpansion() {
         : `${q} ${m}`.trim();
       const inp = document.getElementById('query');
       if (inp) inp.value = newQ;
-      search(newQ);
+      search(newQ, false, { trigger: 'expansion-chip', expansionMod: m });
     };
     row.appendChild(el);
   });
@@ -11937,6 +12021,7 @@ function closeDiag() { document.getElementById('diag-modal').classList.remove('s
 // ============== HISTORY ==============
 const HIST_TYPE_LABEL = {
   search: 'поиск',
+  search_result: 'результат',
   save: 'сохранение',
   skip: 'пропуск',
   transition: 'переход',
@@ -11944,10 +12029,23 @@ const HIST_TYPE_LABEL = {
   error: 'ошибка',
   session_start: 'старт сессии',
   hide: 'скрытие',
+  category_change: 'раздел',
+  tag_untoggle: 'тег ↓',
+};
+const TRIGGER_LABEL = {
+  'manual':            'руками',
+  'tag-click':         'клик по тегу',
+  'preset-change':     'смена раздела',
+  'mode-switch':       'смена режима',
+  'empty-suggestion':  'клик в empty-state',
+  'empty-tip':         'клик «попробуй короче»',
+  'expansion-chip':    '«ещё угол»',
+  'init':              'старт приложения',
 };
 const HIST_FILTERS = [
   { id: 'all', label: 'все', match: () => true },
   { id: 'search', label: 'поиски', match: ev => ev.type === 'search' },
+  { id: 'results', label: 'результаты', match: ev => ev.type === 'search_result' },
   { id: 'save', label: 'сохранения', match: ev => ev.type === 'save' },
   // Скрытия: новый событие 'hide' (с reason + контекстом) + старые
   // 'block'/'hide-category' для обратной совместимости с уже записанной
@@ -11980,7 +12078,51 @@ function fmtHistDuration(ms) {
 function histDetail(ev) {
   const p = ev.payload || {};
   switch (ev.type) {
-    case 'search': return p.query || '';
+    case 'search': {
+      // Подробное действие: query, trigger, тег, раздел, режим, хинты,
+      // целевые источники.
+      const parts = [];
+      parts.push(`«${p.query || '(пусто)'}»`);
+      if (p.trigger) parts.push(TRIGGER_LABEL[p.trigger] || p.trigger);
+      if (p.tag) parts.push(`тег: ${p.tag}`);
+      if (p.category) parts.push(`раздел: ${p.category}`);
+      if (p.mode) parts.push(`режим: ${p.mode === 'artist' ? 'художник' : (p.mode === 'designer' ? 'дизайнер' : (p.mode === 'aesthetic' ? 'эстетика' : p.mode))}`);
+      if (p.artistLevel && p.artistLevel !== 'all') parts.push(`уровень: ${p.artistLevel}`);
+      if (p.platform && p.platform !== 'all') parts.push(`платформа: ${p.platform}`);
+      if (p.domain   && p.domain   !== 'all') parts.push(`тип: ${p.domain}`);
+      if (p.theme    && p.theme    !== 'all') parts.push(`тема: ${p.theme}`);
+      if (p.preset) parts.push(`пресет: ${p.preset}`);
+      if (p.hints && Object.keys(p.hints).length) {
+        const hintsStr = Object.entries(p.hints).map(([k, v]) => `${k}=${v}`).join(', ');
+        parts.push(`хинты: ${hintsStr}`);
+      }
+      if (Array.isArray(p.sources)) parts.push(`целей: ${p.sources.length}`);
+      return parts.join(' · ');
+    }
+    case 'search_result': {
+      // Подробный отчёт: сколько чего по каждому источнику + skipped + duration.
+      const total = p.total || 0;
+      const sources = p.sources || {};
+      const okEntries = Object.entries(sources).filter(([, v]) => v.count > 0);
+      const errEntries = Object.entries(sources).filter(([, v]) => v.error);
+      const okStr = okEntries
+        .sort((a, b) => (b[1].count || 0) - (a[1].count || 0))
+        .map(([s, v]) => `${s}:${v.count}`)
+        .join(', ');
+      const errStr = errEntries
+        .map(([s, v]) => `${s}:${v.error}`)
+        .join(', ');
+      const parts = [`всего: ${total}`];
+      if (okStr) parts.push(`✓ ${okStr}`);
+      if (errStr) parts.push(`✗ ${errStr}`);
+      if (p.skippedCyrillic?.length) parts.push(`пропущено (cyr): ${p.skippedCyrillic.join(', ')}`);
+      if (p.skippedHealth?.length)   parts.push(`пропущено (health): ${p.skippedHealth.join(', ')}`);
+      if (p.fallbackUsed) parts.push('fallback ↺');
+      if (p.durationMs)  parts.push(`${p.durationMs}мс`);
+      return parts.join(' · ');
+    }
+    case 'category_change': return `раздел: ${p.category || '?'} · режим: ${p.mode === 'artist' ? 'художник' : (p.mode === 'designer' ? 'дизайнер' : 'эстетика')}`;
+    case 'tag_untoggle':    return `снят тег «${p.tag || '?'}» из раздела «${p.category || '?'}»`;
     case 'save':   return `из ${p.source || '—'}${p.author ? ' · ' + p.author : ''}`;
     case 'skip':   return `из ${p.source || '—'}`;
     case 'transition': return `${p.kind || ''}: ${p.from || ''} → ${p.to || ''}`;
@@ -12812,7 +12954,7 @@ function applyMode(mode, opts = {}) {
     historyLog('transition', { kind: 'mode', from: previous, to: mode });
     // Запускаем поиск только если запрос непустой. Иначе показываем
     // idle-стейт (renderCard выше — empty-state с предложениями тегов).
-    if (state.query) search(state.query);
+    if (state.query) search(state.query, false, { trigger: 'mode-switch' });
   }
   // Always update the today block visibility & content when applyMode runs
   if (mode === 'aesthetic' && state.view === 'stack') {
@@ -13725,7 +13867,7 @@ window.setRitualMode = function (mode) {
     // Никаких автозапросов на старт — юзер видит чистое поле + placeholder,
     // empty-state с предложенными тегами активного раздела. Поиск стартует
     // только когда юзер сам что-то выбрал или ввёл.
-    if (state.query) search(state.query);
+    if (state.query) search(state.query, false, { trigger: 'init' });
     else renderCard();   // показать idle empty-state
   } catch(e) {
     document.getElementById('card-stack').innerHTML =
