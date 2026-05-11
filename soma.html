@@ -3496,11 +3496,14 @@ function showAlphaKeyBlocker(opts = {}) {
 // Each source can declare which mode(s) it's relevant for. Default: both.
 const SOURCES = [
   { id: 'reddit',     name: 'Reddit',     needsKey: false },
-  { id: 'unsplash',   name: 'Unsplash',   needsKey: true,  defaultOff: { aesthetic: true } },
-  { id: 'pexels',     name: 'Pexels',     needsKey: true,  defaultOff: { aesthetic: true } },
-  { id: 'pixabay',    name: 'Pixabay',    needsKey: true,  defaultOff: { aesthetic: true } },
-  { id: 'flickr',     name: 'Flickr',     needsKey: true  },
-  { id: 'wallhaven',  name: 'Wallhaven',  needsKey: false, viaBackend: true },
+  // 2026-05-11: фото-стоки в designer'е возвращают фото вместо UI — отключены
+  // по умолчанию. В artist оставлены (полезны для рисования с натуры).
+  { id: 'unsplash',   name: 'Unsplash',   needsKey: true,  defaultOff: { aesthetic: true, designer: true } },
+  { id: 'pexels',     name: 'Pexels',     needsKey: true,  defaultOff: { aesthetic: true, designer: true } },
+  { id: 'pixabay',    name: 'Pixabay',    needsKey: true,  defaultOff: { aesthetic: true, designer: true } },
+  { id: 'flickr',     name: 'Flickr',     needsKey: true,  defaultOff: { designer: true } },
+  // Wallhaven — обои (часто аниме/landscape). В designer'е и эстетике шумит.
+  { id: 'wallhaven',  name: 'Wallhaven',  needsKey: false, viaBackend: true, defaultOff: { designer: true, aesthetic: true } },
   { id: 'artic',      name: 'Art Institute', needsKey: false, modes: ['artist', 'aesthetic'] },
   { id: 'smithsonian',name: 'Smithsonian',needsKey: true,    modes: ['artist', 'aesthetic'] },
   { id: 'safebooru',  name: 'Safebooru',  needsKey: false,   modes: ['artist'], defaultOff: true },
@@ -3514,14 +3517,16 @@ const SOURCES = [
   { id: 'dribbble',        name: 'Dribbble',        needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
   { id: 'dribbble-tags',   name: 'Dribbble (теги)', needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
   { id: 'arena-tags',      name: 'Are.na (каналы)', needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
-  { id: 'wikiart',         name: 'WikiArt',         needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
-  { id: 'iarchive',        name: 'Internet Archive', needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
-  { id: 'nypl',            name: 'NYPL',            needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
+  // Музеи/архивы — в designer'е возвращают историческое искусство,
+  // не современный UI. По умолчанию off для designer, оставлены для aesthetic.
+  { id: 'wikiart',         name: 'WikiArt',         needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true } },
+  { id: 'iarchive',        name: 'Internet Archive', needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true } },
+  { id: 'nypl',            name: 'NYPL',            needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true } },
   { id: 'opensea',         name: 'OpenSea',         needsKey: false, viaBackend: true, modes: ['designer'] },
   { id: 'awwwards-rss',    name: 'Awwwards RSS',    needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
   { id: 'siteinspire',     name: 'SiteInspire',     needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
   { id: 'fwa',             name: 'FWA',             needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
-  { id: 'artvee',          name: 'ArtVee',          needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
+  { id: 'artvee',          name: 'ArtVee',          needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true } },
   { id: 'land-book',       name: 'Land-book',       needsKey: false, viaBackend: true, modes: ['designer'] },
   { id: 'pinterest',       name: 'Pinterest',       needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
   { id: 'cosmos',          name: 'Cosmos',          needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
@@ -5578,6 +5583,24 @@ function loadState() {
       state.enabledSourcesByMode.bell = {};
       try { localStorage.removeItem('rs:enabled:bell'); } catch(e) {}
       localStorage.setItem('rs:bellMigrationV3', '1');
+    }
+  } catch (e) {}
+  // Designer / aesthetic cleanup v1 (2026-05-11): отключаем источники
+  // которые физически не имеют нужного контента для этих режимов и
+  // только зашумляли выдачу. Юзер всегда может включить обратно в
+  // настройках. Запускается один раз — по флагу.
+  try {
+    if (!localStorage.getItem('rs:sourceCleanupV1')) {
+      const DESIGNER_KILL = ['unsplash', 'pexels', 'pixabay', 'flickr',
+                             'wallhaven', 'wikiart', 'iarchive', 'nypl', 'artvee'];
+      const AESTHETIC_KILL = ['wallhaven'];
+      const dm = state.enabledSourcesByMode.designer = state.enabledSourcesByMode.designer || {};
+      const am = state.enabledSourcesByMode.aesthetic = state.enabledSourcesByMode.aesthetic || {};
+      for (const id of DESIGNER_KILL)  dm[id] = false;
+      for (const id of AESTHETIC_KILL) am[id] = false;
+      try { storageSet('rs:enabled:designer',  JSON.stringify(dm)); } catch(e) {}
+      try { storageSet('rs:enabled:aesthetic', JSON.stringify(am)); } catch(e) {}
+      localStorage.setItem('rs:sourceCleanupV1', '1');
     }
   } catch (e) {}
   if (legacyEnabled) {
