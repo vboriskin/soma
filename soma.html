@@ -197,52 +197,164 @@
     pointer-events: none;
   }
 
-  /* === Ритуал начала — полноэкранный overlay с цитатой === */
-  .ritual-overlay {
+  /* === Splash screen — одноразовая заставка после первого входа === */
+  /* Полноэкранный overlay; не закрывается сам. Закрытие — по кнопке «войти →». */
+  .splash-overlay {
     position: fixed; inset: 0;
     background: var(--bg);
     z-index: 9999;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0;
-    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
     padding: 32px;
+    opacity: 0;
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   }
-  /* hidden-атрибут должен полностью скрывать overlay, иначе он невидим
-     (opacity:0), но ловит все клики через inset:0 + z-index:9999 — блокирует
-     весь интерфейс. */
-  .ritual-overlay[hidden] { display: none !important; }
-  .ritual-overlay.is-active {
-    animation: ritual-show 7s ease-in-out forwards;
+  .splash-overlay[hidden] { display: none !important; }
+  .splash-overlay.is-visible { opacity: 1; }
+  .splash-overlay.is-leaving { opacity: 0; pointer-events: none; }
+  .splash-frame {
+    position: absolute; inset: 24px;
+    border: 1px solid rgba(26,22,18,0.05); pointer-events: none;
   }
-  .ritual-content { text-align: center; max-width: 540px; }
-  .ritual-text {
-    font-family: 'Fraunces', Georgia, serif;
-    font-style: italic; font-weight: 300;
-    font-size: 22px; line-height: 1.7;
-    color: var(--ink);
-    white-space: pre-line;
+  .splash-meta {
+    position: absolute; top: 56px; left: 0; right: 0;
+    display: flex; justify-content: center; align-items: center; gap: 14px;
+    opacity: 0; transform: translateY(-4px);
   }
-  .ritual-author {
-    margin-top: 32px;
-    font-family: 'Fraunces', Georgia, serif;
-    font-style: italic; font-weight: 300;
-    font-size: 12px;
-    color: var(--ink-mid);
-    letter-spacing: 0.05em;
+  .splash-overlay.run .splash-meta {
+    animation: splash-fadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
   }
-  @keyframes ritual-show {
-    0%   { opacity: 0; }
-    20%  { opacity: 1; }
-    80%  { opacity: 1; }
-    100% { opacity: 0; pointer-events: none; }
+  .splash-meta .label {
+    font-family: 'Inter', sans-serif; font-size: 8pt;
+    text-transform: uppercase; letter-spacing: 0.22em;
+    color: var(--ink-soft, #b5b0a5);
   }
+  .splash-meta .pipe { width: 20px; height: 1px; background: var(--rule); }
+
+  .splash-text-block {
+    position: relative; width: min(880px, 92vw); height: 200px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .splash-line {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Fraunces', serif; font-style: italic; color: var(--ink);
+    line-height: 1.05; letter-spacing: -0.022em;
+    text-align: center; white-space: nowrap; max-width: 100%;
+    opacity: 0;
+    will-change: opacity, filter, transform;
+  }
+  .splash-line.l1 { font-size: 22pt; font-weight: 300; white-space: normal; }
+  .splash-line.l2 { font-size: 30pt; font-weight: 300; }
+  .splash-line.l3 { font-size: 42pt; font-weight: 300; }
+  .splash-line.l4 { font-size: 64pt; font-weight: 300; }
+  .splash-overlay.run .splash-line.l1 { animation: splash-lineSwap 2.4s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards; }
+  .splash-overlay.run .splash-line.l2 { animation: splash-lineSwap 2.4s cubic-bezier(0.16, 1, 0.3, 1) 3.0s forwards; }
+  .splash-overlay.run .splash-line.l3 { animation: splash-lineSwap 2.4s cubic-bezier(0.16, 1, 0.3, 1) 5.6s forwards; }
+  .splash-overlay.run .splash-line.l4 { animation: splash-lineSwap 2.4s cubic-bezier(0.16, 1, 0.3, 1) 8.2s forwards; }
+  @keyframes splash-lineSwap {
+    0%   { opacity: 0; filter: blur(10px); transform: translate(-50%, calc(-50% + 14px)); }
+    25%  { opacity: 1; filter: blur(0);    transform: translate(-50%, -50%); }
+    83%  { opacity: 1; filter: blur(0);    transform: translate(-50%, -50%); }
+    100% { opacity: 0; filter: blur(6px);  transform: translate(-50%, calc(-50% - 10px)); }
+  }
+
+  /* Финальный лого — переиспользует структуру brand-logo */
+  .splash-logo-pos {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .splash-logo {
+    display: inline-flex; align-items: center; gap: 22px;
+    color: var(--ink); opacity: 0;
+  }
+  .splash-logo .splash-logo-mark { width: 92px; height: 50px; flex-shrink: 0; color: currentColor; }
+  .splash-logo .splash-logo-mark .wave { stroke-dasharray: 60; stroke-dashoffset: 60; }
+  .splash-logo .splash-logo-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+  .splash-logo .splash-logo-wordmark {
+    font-family: serif; font-weight: 400; font-size: 30pt;
+    letter-spacing: 0.55em; line-height: 1; color: currentColor;
+  }
+  .splash-logo .splash-logo-wordmark .ch {
+    display: inline-block; opacity: 0; transform: translateY(8px);
+    will-change: opacity, transform, filter;
+  }
+  .splash-logo .splash-logo-sub {
+    font-family: 'Fraunces', serif; font-style: italic; font-weight: 300;
+    font-size: 13pt; color: var(--ink-mid); line-height: 1;
+    letter-spacing: 0.05em; margin-top: 9px; white-space: nowrap;
+    opacity: 0; transform: translateY(4px);
+  }
+  /* Логотип стартует на 10.6s после старта анимации */
+  .splash-overlay.run .splash-logo {
+    animation: splash-fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) 10.6s forwards;
+  }
+  .splash-overlay.run .splash-logo .wave-1 { animation: splash-waveDraw 0.9s cubic-bezier(0.16, 1, 0.3, 1) 10.8s forwards; }
+  .splash-overlay.run .splash-logo .wave-2 { animation: splash-waveDraw 0.9s cubic-bezier(0.16, 1, 0.3, 1) 11.0s forwards; }
+  .splash-overlay.run .splash-logo .wave-3 { animation: splash-waveDraw 0.9s cubic-bezier(0.16, 1, 0.3, 1) 11.2s forwards; }
+  @keyframes splash-waveDraw { to { stroke-dashoffset: 0; } }
+  .splash-overlay.run .splash-logo .ch-1 { animation: splash-chIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 11.65s forwards; }
+  .splash-overlay.run .splash-logo .ch-2 { animation: splash-chIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 11.80s forwards; }
+  .splash-overlay.run .splash-logo .ch-3 { animation: splash-chIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 11.95s forwards; }
+  .splash-overlay.run .splash-logo .ch-4 { animation: splash-chIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 12.10s forwards; }
+  @keyframes splash-chIn {
+    0%   { opacity: 0; transform: translateY(8px); filter: blur(4px); }
+    100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+  .splash-overlay.run .splash-logo .splash-logo-sub {
+    animation: splash-subIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 12.45s forwards;
+  }
+  @keyframes splash-subIn {
+    0%   { opacity: 0; transform: translateY(4px); filter: blur(3px); }
+    100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  }
+  @keyframes splash-fadeIn {
+    0% { opacity: 0; } 100% { opacity: 1; }
+  }
+
+  /* Кнопка «войти →» появляется после того как весь лого собрался */
+  .splash-cta-wrap {
+    position: absolute; bottom: 90px; left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    opacity: 0;
+  }
+  .splash-overlay.run .splash-cta-wrap {
+    animation: splash-fadeIn 1.0s cubic-bezier(0.16, 1, 0.3, 1) 13.2s forwards;
+  }
+  .splash-cta {
+    background: transparent; border: 0; padding: 0;
+    font-family: 'Fraunces', serif; font-style: italic; font-weight: 300;
+    font-size: 16pt; color: var(--ink); cursor: pointer;
+    letter-spacing: 0.01em; line-height: 1;
+    border-bottom: 0.5px solid var(--ink);
+    padding: 2px 4px 6px;
+    transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .splash-cta:hover { opacity: 0.7; transform: translateX(2px); }
+  .splash-cta:focus { outline: none; opacity: 0.8; }
+  .splash-cta-hint {
+    font-family: 'Inter', sans-serif; font-size: 8.5pt;
+    text-transform: uppercase; letter-spacing: 0.22em;
+    color: var(--ink-soft, #b5b0a5);
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .ritual-overlay.is-active {
+    .splash-overlay.run .splash-line,
+    .splash-overlay.run .splash-logo,
+    .splash-overlay.run .splash-logo .wave,
+    .splash-overlay.run .splash-logo .ch,
+    .splash-overlay.run .splash-logo .splash-logo-sub,
+    .splash-overlay.run .splash-cta-wrap,
+    .splash-overlay.run .splash-meta {
       animation: none;
       opacity: 1;
+      transform: translate(-50%, -50%);
+      filter: none;
+      stroke-dashoffset: 0;
     }
+    .splash-overlay.run .splash-line:not(.l4) { opacity: 0; }
   }
-  /* ===================== /Ambient sidebars ===================== */
+  /* ===================== /Splash screen ===================== */
 
   body {
     background: var(--bg);
@@ -2429,12 +2541,39 @@
   })();
 </script>
 
-<!-- Ритуал начала — поэтическая пауза при открытии (один раз в 12 часов
-     или по hotkey ⌘⇧R). Текст и автор подставляются из rituals.json. -->
-<div class="ritual-overlay" id="ritual-overlay" role="dialog" aria-label="ритуал начала" hidden>
-  <div class="ritual-content">
-    <div class="ritual-text" id="ritual-text"></div>
-    <div class="ritual-author" id="ritual-author"></div>
+<!-- Splash screen — одноразовая заставка после первого успешного входа
+     по альфа-ключу. Не закрывается сама — только кнопкой «войти →».
+     Управляется через initSplashScreen() / showSplash() / closeSplash().
+     Флаг localStorage['soma.splashShown'] предотвращает повторный показ. -->
+<div class="splash-overlay" id="splash-overlay" role="dialog" aria-label="заставка soma" hidden>
+  <div class="splash-frame"></div>
+  <div class="splash-meta">
+    <span class="label">SOMA</span>
+    <span class="pipe"></span>
+    <span class="label">a visual study</span>
+  </div>
+  <div class="splash-text-block">
+    <div class="splash-line l1">мне не надо этой AI-ленты в инсте, я <em>СОМА</em> найду красоту</div>
+    <div class="splash-line l2">я <em>СОМА</em> найду красоту</div>
+    <div class="splash-line l3"><em>СОМА</em> найду красоту</div>
+    <div class="splash-line l4"><em>СОМА</em> найду</div>
+    <div class="splash-logo-pos">
+      <div class="splash-logo">
+        <svg class="splash-logo-mark" viewBox="0 0 40 22" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" aria-hidden="true">
+          <path class="wave wave-1" d="M 6 8  Q 12 4, 18 8  T 32 8"/>
+          <path class="wave wave-2" d="M 6 14 Q 12 10, 18 14 T 32 14" opacity="0.55"/>
+          <path class="wave wave-3" d="M 6 20 Q 12 16, 18 20 T 32 20" opacity="0.25"/>
+        </svg>
+        <div class="splash-logo-text">
+          <div class="splash-logo-wordmark"><span class="ch ch-1">S</span><span class="ch ch-2">O</span><span class="ch ch-3">M</span><span class="ch ch-4">A</span></div>
+          <div class="splash-logo-sub">a visual study</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="splash-cta-wrap">
+    <button type="button" class="splash-cta" id="splash-cta-go">войти →</button>
+    <span class="splash-cta-hint">enter</span>
   </div>
 </div>
 
@@ -2828,7 +2967,7 @@
 
       </div>
 
-      <!-- Tab: ОКРУЖЕНИЕ — ambient + ritual -->
+      <!-- Tab: ОКРУЖЕНИЕ — ambient + layout + compact-UI -->
       <div class="settings-tab" data-settings-tab="ambient" role="tabpanel" hidden>
 
         <div class="field" id="ambient-section">
@@ -2870,19 +3009,6 @@
           </div>
         </div>
 
-        <hr class="sep">
-
-        <div class="field" id="ritual-section">
-          <label style="display: block; font-size: 9px; color: var(--ink-mid); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.18em;">ритуал начала</label>
-          <p class="help" style="margin-bottom: 10px;">короткая поэтическая пауза при открытии. хайку и фразы — 7 секунд тишины перед интерфейсом.</p>
-          <div id="ritual-modes" style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap;">
-            <button class="text-link" data-ritual-mode="off">выкл</button>
-            <button class="text-link" data-ritual-mode="daily">раз в день</button>
-            <button class="text-link" data-ritual-mode="always">при каждом открытии</button>
-          </div>
-          <p class="help" style="margin-top: 10px; font-style: italic;">повторить ритуал · <span style="font-family: monospace;">⌘⇧R</span> (Mac) / <span style="font-family: monospace;">Ctrl+Shift+R</span></p>
-        </div>
-
         <!-- Скрытые режимы — секция появляется только если бэкенд подтвердил
              capability через /api/info. Без BELL_KEY юзер не увидит даже
              заголовок. -->
@@ -2914,7 +3040,7 @@
 
         <!-- 6.F: QR-sync — перенос настроек между устройствами без backend.
              В QR влезает ~3KB — пакуем настройки (sources, presets, theme,
-             ambient, layout, ritual). Коллекция — слишком большая, через
+             ambient, layout). Коллекция — слишком большая, через
              postmortem zip + AirDrop/Dropbox. -->
         <div class="field" id="qrsync-section">
           <label style="display: block; font-size: 9px; color: var(--ink-mid); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.18em;">синхронизация устройств</label>
@@ -5898,7 +6024,7 @@ function syncFromStorage(key) {
       const raw = localStorage.getItem('rs:customPresets');
       if (raw) state.customPresets = JSON.parse(raw) || [];
     }
-    // rs:lastRitual, rs:ritual, rs:tone, rs:cardTimer — не реагируем,
+    // rs:tone, rs:cardTimer — не реагируем,
     // они не вызывают визуального диссонанса между вкладками.
   } catch (err) {
     console.warn('[multi-tab sync]', key, err.message);
@@ -11132,7 +11258,7 @@ function _packSettings() {
     'rs:presetSources:v2','rs:customPresets','rs:activeCustomPreset',
     'rs:subs:artist','rs:subs:designer','rs:subs:aesthetic',
     'rs:theme','rs:ambient','rs:layout','rs:modeui','rs:catsui',
-    'rs:ritual','rs:tone','rs:cardTimer','rs:artistLevel',
+    'rs:tone','rs:cardTimer','rs:artistLevel',
     'rs:designerPlatform','rs:designerDomain','rs:aestheticTheme',
     'rs:cache','rs:keys'];
   for (const k of keys) {
@@ -13592,177 +13718,74 @@ function closeFullscreenImage() {
   if (o) o.remove();
 }
 
-// ============== RITUAL — поэтическая пауза при открытии ==============
+// ============== SPLASH — одноразовая заставка после первого входа ==============
 // Логика:
-//  - На init проверяем localStorage['rs:ritual'] (off|daily|always) и
-//    localStorage['rs:lastRitual'] (timestamp). Если daily и >12h прошло —
-//    показываем. Если always — каждый запуск.
-//  - Hotkey ⌘⇧R / Ctrl+Shift+R — повторный показ независимо от lastRitual.
-//  - Click / Escape — мгновенный close.
-const RITUAL_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 часов
+//  - Показывается ровно один раз, при первом запуске SOMA после ввода
+//    альфа-ключа (или просто при первом запуске на localhost).
+//  - Анимация ~14 секунд: фраза «мне не надо этой AI-ленты в инсте, я СОМА
+//    найду красоту» сокращается до одного слова, затем собирается логотип
+//    с волнами и подписью «a visual study». Сам не закрывается.
+//  - Кнопка «войти →» снизу: клик / Enter → splash уходит, флаг сохраняется,
+//    больше не показывается. Любая другая активность не закрывает экран.
+const SPLASH_SHOWN_LS = 'soma.splashShown';
+function _splashShown()  { try { return localStorage.getItem(SPLASH_SHOWN_LS) === '1'; } catch { return false; } }
+function _splashMarkShown() { try { localStorage.setItem(SPLASH_SHOWN_LS, '1'); } catch {} }
 
-// Цитаты встроены inline (не fetch'аются из rituals.json), потому что
-// при открытии soma.html через file:// Chrome блокирует fetch локального
-// JSON через CORS. Inline-array работает в любом контексте: file://,
-// localhost-сервер, продакшн. Если хочется править — править сразу здесь.
-const RITUAL_QUOTES = [
-  { text: "старый пруд\nлягушка прыгнула в воду\nвсплеск тишины", author: "басё" },
-  { text: "из-за облаков\nвышла луна и ушла —\nусталое сердце", author: "басё" },
-  { text: "на голой ветке\nворон сидит одиноко —\nосенний вечер", author: "басё" },
-  { text: "в саду гостинцы\nвешний дождь —\nприходит и уходит", author: "басё" },
-  { text: "лето в траве\nвсё что осталось\nот мечтаний воина", author: "басё" },
-  { text: "облетают цветы —\nкак скоро\nпройдёт эта жизнь", author: "иса" },
-  { text: "утренний снег\nнеяркий\nне торопись", author: "иса" },
-  { text: "тихий храм\nцветы сливы\nвысоко в небе", author: "бусон" },
-  { text: "и здесь и там\nрассыпалась вишня\nпо реке весны", author: "бусон" },
-  { text: "лёгкий снег —\nкак беспечно\nон опадает", author: "иса" },
-  { text: "колокол молчит\nотзвук уходит\nв вечерний цвет", author: "басё" },
-  { text: "дзенский сад\nни листа\nни мысли", author: null },
-  { text: "есть только настоящее\nоно движется медленно", author: "тарковский" },
-  { text: "красота должна спасти\nне мир\nа взгляд", author: null },
-  { text: "вдруг становится виднее\nкогда замедляешь шаг", author: null },
-  { text: "у меня есть время —\nсамая богатая фраза\nна свете", author: null },
-  { text: "не торопись\nсмотри пристально\nдыши медленно", author: null },
-  { text: "всё своё время\nи это всё", author: null },
-  { text: "пыль в луче света\nчем не вселенная", author: null },
-  { text: "в окне утром\nживая тень дерева —\nвсё ещё на месте", author: null },
-  { text: "тишина —\nэто тоже что-то\nиз чего видно", author: "седакова" },
-  { text: "красота не там где её ищут\nа там где не мешают ей быть", author: null },
-  { text: "медленно — это самый\nдревний из языков", author: null },
-  { text: "глаза устают от изобилия\nотдыхают от тонкого", author: null },
-  { text: "запоминается не то что увидел\nа как смотрел", author: null },
-  { text: "в каждом дне\nесть один кадр\nза которым стоит остановиться", author: null },
-  { text: "не всё что прекрасно\nдолжно быть твоим", author: null },
-  { text: "видеть ясно —\nуже большой труд", author: null },
-  { text: "пускай день будет\nкак стихотворение\nнаписанное о тишине", author: null },
-  { text: "в комнате\nоднажды\nпоявляется свет", author: null },
-  { text: "только настоящее\nне нуждается в подтверждении", author: null },
-  { text: "камень не спешит\nи всё успевает", author: null },
-  { text: "лучшее из найденного\nнайдено случайно", author: null },
-  { text: "глубина — это выдержка\nа не знание", author: null },
-  { text: "то что я видел в детстве\nостаётся ярче\nчем всё что после", author: "тарковский" },
-  { text: "память — это тоже зрение\nтолько повёрнутое внутрь", author: null },
-  { text: "сначала смотри\nпотом думай\nпотом снова смотри", author: null },
-  { text: "тёплая вода\nиз чёрного чайника —\nдень начинается", author: null },
-  { text: "тишина утра\nне про отсутствие звука\nа про присутствие времени", author: null },
-  { text: "одна правильная вещь\nна столе\nи день упорядочен", author: null },
-  { text: "вкус хлеба\nсвет на стене\nещё ничего не случилось — и достаточно", author: null },
-  { text: "мир сам рассказывает себя\nкогда мы\nперестаём говорить за него", author: null },
-  { text: "красивое\nуже произошло —\nосталось заметить", author: null },
-  { text: "взгляд медленный\nкак чай\nкак дыхание", author: null },
-  { text: "что не вмещается в слова\nто и нужно увидеть", author: null },
-  { text: "у красивого\nнет цели", author: null },
-  { text: "всякое утро\nвозможность начать\nс пустой страницы", author: null },
-  { text: "горы стоят\nреки текут\nя пью чай", author: null },
-  { text: "во всякой тишине\nотчётливее слышно\nто что было\nраньше слов", author: null },
-  { text: "видеть медленно —\nзначит видеть дольше", author: null },
-  { text: "если не торопиться\nуспеваешь больше", author: null },
-];
-
-// Сохраняем оригинальную функцию loadRituals для совместимости — но теперь
-// она просто возвращает inline-массив. Никаких fetch'ей.
-async function loadRituals() { return RITUAL_QUOTES; }
-
-function pickRitual() {
-  if (!RITUAL_QUOTES || !RITUAL_QUOTES.length) return null;
-  return RITUAL_QUOTES[Math.floor(Math.random() * RITUAL_QUOTES.length)];
-}
-
-function getRitualMode() {
-  try {
-    const v = localStorage.getItem('rs:ritual');
-    if (v === 'off' || v === 'always' || v === 'daily') return v;
-  } catch (e) {}
-  return 'daily'; // дефолт
-}
-
-function shouldShowRitualNow() {
-  const mode = getRitualMode();
-  if (mode === 'off') return false;
-  if (mode === 'always') return true;
-  // daily: проверяем lastRitual.
-  try {
-    const last = Number(localStorage.getItem('rs:lastRitual') || 0);
-    if (!last) return true;
-    return (Date.now() - last) > RITUAL_INTERVAL_MS;
-  } catch (e) { return true; }
-}
-
-let _ritualTimer = null;
-async function showRitual(trigger = 'auto') {
-  await loadRituals();
-  const quote = pickRitual();
-  if (!quote) return;
-  const overlay = document.getElementById('ritual-overlay');
-  const textEl = document.getElementById('ritual-text');
-  const authorEl = document.getElementById('ritual-author');
-  if (!overlay || !textEl || !authorEl) return;
-  textEl.textContent = quote.text;
-  authorEl.textContent = quote.author ? `— ${quote.author}` : '';
-  overlay.hidden = false;
-  // Перезапускаем CSS-анимацию.
-  overlay.classList.remove('is-active');
-  // forced reflow → animation restarts cleanly
-  void overlay.offsetWidth;
-  overlay.classList.add('is-active');
-  try { localStorage.setItem('rs:lastRitual', String(Date.now())); } catch (e) {}
-  historyLog('ritual', { quote: (quote.author ? quote.author + ' · ' : '') + quote.text.split('\n')[0], trigger });
-  // Автозакрытие через 7s (на случай если animation закончилась но overlay
-  // остался в DOM — особенно важно для prefers-reduced-motion).
-  if (_ritualTimer) clearTimeout(_ritualTimer);
-  _ritualTimer = setTimeout(closeRitual, 7000);
-}
-
-function closeRitual() {
-  const overlay = document.getElementById('ritual-overlay');
+function showSplash() {
+  const overlay = document.getElementById('splash-overlay');
   if (!overlay) return;
-  overlay.classList.remove('is-active');
-  overlay.hidden = true;
-  if (_ritualTimer) { clearTimeout(_ritualTimer); _ritualTimer = null; }
+  // блокируем body scroll на время заставки
+  try { document.body.style.overflow = 'hidden'; } catch (e) {}
+  overlay.hidden = false;
+  // forced reflow → анимации стартуют чисто
+  overlay.classList.remove('run', 'is-visible', 'is-leaving');
+  void overlay.offsetWidth;
+  overlay.classList.add('is-visible', 'run');
+  try { historyLog('splash_shown', { ts: Date.now() }); } catch (e) {}
+  // Кнопка → закрыть
+  const cta = document.getElementById('splash-cta-go');
+  if (cta) cta.addEventListener('click', closeSplash, { once: true });
+  // Enter тоже работает
+  const onKey = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); closeSplash(); }
+  };
+  document.addEventListener('keydown', onKey);
+  overlay._splashKeyHandler = onKey;
 }
 
-// Клик / Escape — закрыть. Только когда overlay активен.
-function _onRitualClick() { closeRitual(); }
-function _onRitualKey(e) {
-  if (e.key === 'Escape') {
-    const overlay = document.getElementById('ritual-overlay');
-    if (overlay && !overlay.hidden) {
-      e.preventDefault();
-      closeRitual();
-    }
+function closeSplash() {
+  const overlay = document.getElementById('splash-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('is-visible');
+  overlay.classList.add('is-leaving');
+  if (overlay._splashKeyHandler) {
+    document.removeEventListener('keydown', overlay._splashKeyHandler);
+    overlay._splashKeyHandler = null;
   }
+  _splashMarkShown();
+  try { historyLog('splash_dismissed', { ts: Date.now() }); } catch (e) {}
+  // После CSS-transition (0.5s) — убираем из DOM-flow и возвращаем scroll
+  setTimeout(() => {
+    overlay.hidden = true;
+    overlay.classList.remove('run', 'is-leaving');
+    try { document.body.style.overflow = ''; } catch (e) {}
+  }, 550);
 }
 
-// Hotkey ⌘⇧R / Ctrl+Shift+R — попытка перехвата browser hard reload.
-// preventDefault() работает в большинстве случаев; если браузер всё-таки
-// перезагрузит страницу — пользователь увидит ритуал по daily-логике.
-function _onRitualHotkey(e) {
-  const isMac = navigator.platform.toUpperCase().includes('MAC');
-  const meta = isMac ? e.metaKey : e.ctrlKey;
-  if (meta && e.shiftKey && (e.key === 'R' || e.key === 'r')) {
-    e.preventDefault();
-    e.stopPropagation();
-    showRitual('hotkey');
+// Проверяем нужно ли показать splash. Условия:
+//  - флаг ещё не выставлен
+//  - юзер прошёл alpha-gate (на prod backend — есть ключ; на localhost — всегда)
+function shouldShowSplash() {
+  if (_splashShown()) return false;
+  // На prod backend без альфа-ключа splash не показываем — впереди ещё блокер
+  if (typeof isProdBackend === 'function' && isProdBackend()) {
+    if (typeof getAlphaKey === 'function' && !getAlphaKey()) return false;
   }
+  return true;
 }
+
 
 document.addEventListener('DOMContentLoaded', () => {
-  const overlay = document.getElementById('ritual-overlay');
-  if (overlay) overlay.addEventListener('click', _onRitualClick);
-  document.addEventListener('keydown', _onRitualKey);
-  document.addEventListener('keydown', _onRitualHotkey);
-  // Wire ritual mode buttons в settings.
-  const wireRitualBtns = () => {
-    document.querySelectorAll('#ritual-modes [data-ritual-mode]').forEach(btn => {
-      btn.addEventListener('click', () => window.setRitualMode(btn.getAttribute('data-ritual-mode')));
-    });
-    // Установить активную подсветку.
-    const cur = getRitualMode();
-    document.querySelectorAll('#ritual-modes [data-ritual-mode]').forEach(b => {
-      b.classList.toggle('active', b.getAttribute('data-ritual-mode') === cur);
-    });
-  };
-  wireRitualBtns();
   // Wire layout-mode (снизу / сбоку) buttons. Меняет body[data-layout]
   // и сохраняет в localStorage.
   const wireLayoutBtns = () => {
@@ -13827,22 +13850,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
   wireCacheBtns();
-  // Авто-показ через 200ms после загрузки — даём интерфейсу отрисоваться.
+  // Splash screen — одноразовый показ при первом запуске после ввода
+  // альфа-ключа. shouldShowSplash() сам разбирается, надо ли вообще.
+  // Задержка 250ms — даём интерфейсу отрисоваться, чтобы overlay не мигал.
   setTimeout(() => {
-    if (shouldShowRitualNow()) showRitual('auto');
-  }, 200);
+    if (typeof shouldShowSplash === 'function' && shouldShowSplash()) {
+      showSplash();
+    }
+  }, 250);
 });
 
-// Public API для secondary UI.
-window.showRitual = showRitual;
-window.setRitualMode = function (mode) {
-  if (!['off', 'daily', 'always'].includes(mode)) mode = 'daily';
-  try { localStorage.setItem('rs:ritual', mode); } catch (e) {}
-  // Подсветка активной кнопки в settings.
-  document.querySelectorAll('#ritual-modes [data-ritual-mode]').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('data-ritual-mode') === mode);
-  });
-};
+// Public API для secondary UI / dev console.
+window.showSplash = showSplash;
+window.closeSplash = closeSplash;
 
 // ============== AMBIENT SIDEBAR ANIMATION ==============
 // Тихая фоновая анимация по бокам контента — sumi-e штрихи, мягкое боке или
