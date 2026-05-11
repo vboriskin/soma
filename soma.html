@@ -12220,16 +12220,209 @@ function clearHistory() {
   renderHistory();
 }
 
+// ============== HISTORY EXPORT ==============
+// Расширенный экспорт: помимо самих событий — снимок текущего состояния,
+// метрики, агрегаты, blocklist'ы (только размеры/айди для приватности),
+// per-source diag, контекст окружения. Цель — чтобы по одному JSON можно
+// было полностью разобрать сессию без обращения к серверу.
 function exportHistoryJson() {
-  const events = state.history.events;
-  const counts = events.reduce((m, e) => (m[e.type] = (m[e.type] || 0) + 1, m), {});
+  const events = state.history.events || [];
+
+  // --- byType (event-type counts) ---
+  const byType = events.reduce((m, e) => (m[e.type] = (m[e.type] || 0) + 1, m), {});
+
+  // --- topN по полю в payload ---
+  const topN = (predicate, key, n = 10) => {
+    const counts = {};
+    for (const e of events) {
+      if (!predicate(e)) continue;
+      const k = key(e);
+      if (!k) continue;
+      counts[k] = (counts[k] || 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, c]) => ({ key: k, count: c }));
+  };
+
+  // --- topSources (за разные действия) ---
+  const sourcesPerAction = {
+    impressions: topN(e => e.type === 'search_result' && e.payload?.sources, e => null, 10),
+    saved:       topN(e => e.type === 'save',  e => e.payload?.source, 10),
+    skipped:     topN(e => e.type === 'skip',  e => e.payload?.source, 10),
+    hidden:      topN(e => e.type === 'hide',  e => e.payload?.source, 10),
+    opened:      topN(e => e.type === 'open',  e => e.payload?.source, 10),
+    errored:     topN(e => e.type === 'error', e => e.payload?.source, 20),
+  };
+  // sourceImpressions считаем из перебора всех search_result.sources
+  const impressions = {};
+  for (const e of events) {
+    if (e.type !== 'search_result') continue;
+    const srcs = e.payload?.sources || {};
+    for (const [s, info] of Object.entries(srcs)) {
+      if (typeof info?.count === 'number') impressions[s] = (impressions[s] || 0) + info.count;
+    }
+  }
+  sourcesPerAction.impressions = Object.entries(impressions).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, c]) => ({ key: k, count: c }));
+
+  // --- topTags / topCategories / triggers / hideReasons ---
+  const topTags       = topN(e => e.type === 'search', e => e.payload?.tag,      15);
+  const topCategories = topN(e => e.type === 'search', e => e.payload?.category, 15);
+  const triggers      = topN(e => e.type === 'search', e => e.payload?.trigger,  10);
+  const hideReasons   = topN(e => e.type === 'hide',   e => e.payload?.reason,   10);
+
+  // --- error messages topN ---
+  const errorsByMessage = topN(e => e.type === 'error', e => `${e.payload?.source || '?'}: ${e.payload?.message || ''}`.slice(0, 80), 15);
+
+  // --- avg search duration ---
+  const durations = events.filter(e => e.type === 'search_result' && typeof e.payload?.durationMs === 'number').map(e => e.payload.durationMs);
+  const avgDuration = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null;
+  const maxDuration = durations.length ? Math.max(...durations) : null;
+  const minDuration = durations.length ? Math.min(...durations) : null;
+
+  // --- recent (последние 10 по типам) ---
+  const lastN = (predicate, n) => events.filter(predicate).slice(-n).map(e => ({
+    ts: new Date(e.ts).toISOString(), type: e.type, payload: e.payload,
+  }));
+
+  // --- empty searches ---
+  const emptyResults = events.filter(e => e.type === 'search_result' && (e.payload?.total || 0) === 0).length;
+
+  // --- snapshot текущего состояния ---
+  const currentState = {
+    mode: state.mode,
+    view: state.view,
+    query: state.query || '',
+    activeCategory: (typeof activeCategory !== 'undefined' ? activeCategory : null),
+    axes: {
+      artistLevel: state.artistLevel || 'all',
+      designerPlatform: state.designerPlatform || 'all',
+      designerDomain: state.designerDomain || 'all',
+      aestheticTheme: state.aestheticTheme || 'all',
+    },
+    bell: { available: !!state.bellAvailable, enabled: !!state.bellEnabled },
+    activeCustomPreset: state.activeCustomPreset || null,
+    subreddits: state.subreddits || [],
+    enabledSourcesByMode: state.enabledSourcesByMode || {},
+    likedCount: (state.liked || []).length,
+    queueSize: (state.queue || []).length,
+  };
+
+  // --- blocklist'ы (без содержимого для приватности — только размеры/айди) ---
+  const globalBL = state.blocklist || { images: [], authors: [], sources: [] };
+  const catBL = state.categoryBlocklist || {};
+  const catBLSummary = {};
+  for (const [cat, b] of Object.entries(catBL)) {
+    catBLSummary[cat] = {
+      images: (b.images || []).length,
+      authors: (b.authors || []).length,
+      sources: (b.sources || []),   // sources ids — публичные, безопасно
+    };
+  }
+
+  // --- per-source diag snapshot ---
+  const diag = {};
+  for (const [sid, info] of Object.entries(state.diag || {})) {
+    diag[sid] = {
+      status: info.status || 'unknown',
+      lastTested: info.lastTested ? new Date(info.lastTested).toISOString() : null,
+      ms: info.ms || null,
+      items: info.items || null,
+      statusCode: info.statusCode || null,
+      error: info.error || null,
+    };
+  }
+
+  // --- env context ---
+  const ctx = {
+    appVersion: (typeof APP_VERSION === 'string' ? APP_VERSION : '?'),
+    clientId: CLIENT_ID || null,
+    backendUrl: BACKEND_URL || '(same-origin)',
+    userAgent: navigator.userAgent,
+    viewport: { width: window.innerWidth, height: window.innerHeight, dpr: window.devicePixelRatio || 1 },
+    locale: navigator.language || '?',
+    layout: document.body.getAttribute('data-layout') || 'below',
+    ambient: document.body.getAttribute('data-ambient') || 'off',
+    modeui:  document.body.getAttribute('data-modeui') || 'full',
+    catsui:  document.body.getAttribute('data-catsui') || 'all',
+  };
+  // Backend info (если /api/info уже отвечал)
+  const backendInfo = (typeof diagBackendInfo !== 'undefined' && diagBackendInfo) ? {
+    name: diagBackendInfo.backend?.name || null,
+    version: diagBackendInfo.backend?.version || null,
+    node: diagBackendInfo.backend?.node || null,
+    uptimeSec: diagBackendInfo.backend?.uptimeSec || null,
+    envFlags: diagBackendInfo.env || {},
+    capabilities: diagBackendInfo.capabilities || {},
+  } : null;
+
+  // --- sources catalogue (id+name+modes+needsKey) — для быстрой расшифровки ---
+  const sourcesCatalogue = (Array.isArray(SOURCES) ? SOURCES : []).map(s => ({
+    id: s.id, name: s.name, modes: s.modes || null,
+    needsKey: !!s.needsKey, viaBackend: !!s.viaBackend,
+    keyConfigured: !!(s.id && state.keys?.[s.id]),
+  }));
+
+  // --- outbox state (если есть незаплевавшие push) ---
+  let outboxSize = 0;
+  try { outboxSize = (_outboxLoad() || []).length; } catch (e) {}
+
   const payload = {
     exportedAt: new Date().toISOString(),
     sessionStartedAt: new Date(state.history.startedAt).toISOString(),
-    durationMs: Date.now() - state.history.startedAt,
-    aggregates: counts,
-    events: events.map(e => ({ ts: new Date(e.ts).toISOString(), type: e.type, payload: e.payload })),
+    sessionDurationMs: Date.now() - state.history.startedAt,
+    schemaVersion: 2,
+
+    context: ctx,
+    backendInfo,
+    currentState,
+
+    metrics: {
+      ...state.metrics,
+      eventCount: events.length,
+      outboxPending: outboxSize,
+    },
+
+    aggregates: {
+      byType,
+      topTags,
+      topCategories,
+      triggers,
+      hideReasons,
+      sourcesPerAction,
+      errorsByMessage,
+      searchDurationMs: { avg: avgDuration, min: minDuration, max: maxDuration, samples: durations.length },
+      emptyResults,
+    },
+
+    recent: {
+      searches:   lastN(e => e.type === 'search',        10),
+      results:    lastN(e => e.type === 'search_result', 10),
+      hides:      lastN(e => e.type === 'hide',          20),
+      saves:      lastN(e => e.type === 'save',          20),
+      errors:     lastN(e => e.type === 'error',         20),
+      transitions:lastN(e => e.type === 'transition',    20),
+    },
+
+    blocklists: {
+      global: {
+        images:  (globalBL.images || []).length,
+        authors: (globalBL.authors || []).length,
+        sources: globalBL.sources || [],   // id'шники — не sensitive
+      },
+      byCategory: catBLSummary,
+    },
+
+    sourcesCatalogue,
+    diag,
+
+    // Полный поток событий — last (для совместимости со старым экспортом).
+    events: events.map(e => ({
+      ts: new Date(e.ts).toISOString(),
+      id: e.id || null,
+      type: e.type,
+      payload: e.payload,
+    })),
   };
+
   downloadJson(payload, `soma-history-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`);
 }
 
