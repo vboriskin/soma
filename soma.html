@@ -8195,19 +8195,27 @@ function buildSearchContext(query, opts = {}) {
   if (state.mode === 'designer')   { ctx.platform = state.designerPlatform || 'all'; ctx.domain = state.designerDomain || 'all'; }
   if (state.mode === 'aesthetic')  ctx.theme = state.aestheticTheme || 'all';
   // Активные хинты (те что эффективно навешиваются в effectiveQueryFor).
+  // Маппы хинтов опциональны — если их нет в коде (как сейчас, после
+  // revert'а хинт-эксперимента), просто пропускаем. typeof-чек защищает
+  // от ReferenceError на undeclared identifiers.
   const hints = {};
-  if (state.mode === 'artist' && ARTIST_LEVEL_HINTS[state.artistLevel]) {
-    hints.level = ARTIST_LEVEL_HINTS[state.artistLevel];
-  }
+  try {
+    const LH = (typeof ARTIST_LEVEL_HINTS !== 'undefined') ? ARTIST_LEVEL_HINTS : null;
+    if (state.mode === 'artist' && LH && LH[state.artistLevel]) hints.level = LH[state.artistLevel];
+  } catch (e) {}
   if (state.mode === 'designer') {
-    const ch = DESIGNER_CATEGORY_HINTS[activeCategory];
-    if (ch) hints.category = ch;
+    try {
+      const DH = (typeof DESIGNER_CATEGORY_HINTS !== 'undefined') ? DESIGNER_CATEGORY_HINTS : null;
+      if (DH && DH[activeCategory]) hints.category = DH[activeCategory];
+    } catch (e) {}
     if (ctx.platform && ctx.platform !== 'all') hints.platform = ctx.platform;
     if (ctx.domain   && ctx.domain   !== 'all') hints.domain   = ctx.domain;
   }
   if (state.mode === 'aesthetic') {
-    const ch = AESTHETIC_CATEGORY_HINTS[activeCategory];
-    if (ch) hints.category = ch;
+    try {
+      const AH = (typeof AESTHETIC_CATEGORY_HINTS !== 'undefined') ? AESTHETIC_CATEGORY_HINTS : null;
+      if (AH && AH[activeCategory]) hints.category = AH[activeCategory];
+    } catch (e) {}
   }
   if (Object.keys(hints).length) ctx.hints = hints;
   // Целевые источники (после всех фильтров — pres-binding, blocklist,
