@@ -2629,7 +2629,10 @@
   <div class="modal">
     <div class="modal-header">
       <h2>настройки</h2>
-      <button class="text-link" id="settings-close" aria-label="Закрыть">закрыть</button>
+      <div style="display: flex; gap: 18px; align-items: baseline;">
+        <button class="text-link" id="settings-fresh-reload" title="Сбросить кеш браузера и подтянуть свежий код. Ключи и настройки сохранятся.">обновить ↻</button>
+        <button class="text-link" id="settings-close" aria-label="Закрыть">закрыть</button>
+      </div>
     </div>
     <!-- Вкладки настроек. Каждая вкладка — отдельная секция в modal-body
          с data-settings-tab. По умолчанию активна 'sources'. -->
@@ -10943,6 +10946,26 @@ bind('settings-btn', () => {
 });
 bind('settings-close', () => {
   document.getElementById('settings-modal').classList.remove('show');
+});
+
+// «обновить ↻» в шапке настроек — снимает регистрацию SW, чистит
+// Cache Storage и hard-reloadит страницу. localStorage (ключ, настройки,
+// история, blocklist'ы) НЕ трогается — юзер не потеряет состояние.
+// Используется когда автообновление SW по controllerchange не сработало
+// (бывает редко, но раздражает когда случается).
+bind('settings-fresh-reload', async () => {
+  if (!confirm('Скачать свежую версию приложения?\n\nКеш браузера очистится, ключ и настройки сохранятся.')) return;
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister().catch(() => null)));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k).catch(() => null)));
+    }
+  } catch (e) { /* ignore — всё равно reload */ }
+  location.reload();
 });
 
 // Вкладки настроек: переключают visibility tab-panels по data-settings-tab.
