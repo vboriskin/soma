@@ -1576,38 +1576,7 @@
     }
     /* card-stack может занять всю vertical space — нет actions снизу. */
     body[data-layout="side"] .card-stack { margin-bottom: 0; }
-    /* Мини-подпись (автор · источник) под кнопкой «скрыть» в side-layout.
-       Небольшой отступ сверху, тонкий шрифт, ink-soft. В below-layout
-       прячем — там автор уже виден в caption под картинкой. */
-    body[data-layout="side"] .action-meta {
-      display: block;
-      margin-top: 16px;
-      max-width: 180px;
-      font-family: 'Fraunces', serif;
-      font-style: italic;
-      font-weight: 300;
-      font-size: 11px;
-      line-height: 1.45;
-      color: var(--ink-soft);
-      pointer-events: auto;
-    }
-    body[data-layout="side"] .action-meta .meta-author {
-      color: var(--ink-mid);
-      display: block;
-      margin-bottom: 2px;
-    }
-    body[data-layout="side"] .action-meta a {
-      color: inherit;
-      border-bottom: 0.5px solid transparent;
-      transition: border-color 0.2s, color 0.2s;
-    }
-    body[data-layout="side"] .action-meta a:hover {
-      color: var(--ink);
-      border-bottom-color: var(--ink);
-    }
   }
-  /* По умолчанию (и в below-layout) — скрыт. */
-  .action-meta { display: none; }
   .hide-menu .hide-menu-title { color: var(--ink-soft); }
   .hide-menu .hide-menu-sep { color: var(--ink-soft); }
   .hide-menu .text-link { font-size: 12px; }
@@ -2579,10 +2548,6 @@
     <button class="action-btn like" id="btn-like">сохранить</button>
     <span class="action-btn divider hide-divider">·</span>
     <button class="action-btn hide" id="btn-hide" title="скрыть эту картинку, автора или источник">скрыть ×</button>
-    <!-- Под «скрыть» — мини-подпись с автором и источником текущей карты.
-         Только в side-layout (CSS прячет в below-layout, где автор уже
-         виден в caption под картинкой). -->
-    <div class="action-meta" id="action-meta" aria-hidden="true"></div>
   </div>
 
   <!-- Hide submenu — поверх actions при клике на «× скрыть». Только в стопке.
@@ -3523,9 +3488,7 @@ const SOURCES = [
   { id: 'fwa',             name: 'FWA',             needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
   { id: 'artvee',          name: 'ArtVee',          needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
   { id: 'land-book',       name: 'Land-book',       needsKey: false, viaBackend: true, modes: ['designer'] },
-  // 2026-05-11: Pinterest stable-fails из VDS (8 timeout из 8 в реальной
-  // сессии). Default-off — кто хочет, включит в settings.
-  { id: 'pinterest',       name: 'Pinterest',       needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: true },
+  { id: 'pinterest',       name: 'Pinterest',       needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
   { id: 'cosmos',          name: 'Cosmos',          needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
   // posts.cv search скрыт за логином — даже через headless 0. defaultOff.
   { id: 'readcv',          name: 'Read.cv',         needsKey: false, viaBackend: true, modes: ['designer'], defaultOff: true },
@@ -3904,306 +3867,306 @@ const CATEGORIES_ARTIST = {
 
 const CATEGORIES_DESIGNER = {
   'тренды дня': [
-    { label: 'site of the day', q: 'site of the day awwwards screenshot' },
+    { label: 'site of the day', q: 'site of the day awwwards' },
     { label: 'site of the month', q: 'site of the month awwwards' },
     { label: 'dribbble popular', q: 'dribbble popular' },
     { label: 'siteinspire', q: 'siteinspire portfolio minimal' },
-    { label: 'behance featured', q: 'behance featured ui' },
+    { label: 'behance featured', q: 'behance featured' },
     { label: 'minimal portfolio 2025', q: 'minimal portfolio 2025' },
-    { label: 'interface inspiration', q: 'interface inspiration screen' },
+    { label: 'interface inspiration', q: 'interface inspiration' },
     { label: 'daily ui', q: 'daily ui dribbble' },
   ],
   'продукт': [
-    { label: 'dashboard', q: 'dashboard ui design analytics' },
-    { label: 'saas интерфейс', q: 'saas product interface screenshot' },
-    { label: 'плотная таблица', q: 'data table dense ui spreadsheet' },
-    { label: 'настройки', q: 'settings page design form' },
-    { label: 'онбординг', q: 'onboarding flow welcome screen' },
-    { label: 'empty state', q: 'empty state ui illustration' },
-    { label: 'уведомления', q: 'notification design pattern toast' },
-    { label: 'command palette', q: 'command palette ui fuzzy search' },
-    { label: 'sidebar', q: 'sidebar navigation rail' },
-    { label: 'pricing saas', q: 'pricing page saas three tier' },
-    { label: 'crm', q: 'crm interface pipeline' },
-    { label: 'email клиент', q: 'email client design inbox' },
-    { label: 'календарь', q: 'calendar app design scheduling' },
-    { label: 'заметки', q: 'notes app design block editor' },
-    { label: 'kanban', q: 'kanban board design cards columns' },
-    { label: 'wiki', q: 'wiki interface design knowledge base' },
-    { label: 'code editor', q: 'code editor ui vscode' },
-    { label: 'terminal', q: 'terminal aesthetic ui monospace' },
-    { label: 'dev tools', q: 'dev tools dashboard monitoring' },
+    { label: 'dashboard', q: 'dashboard ui design' },
+    { label: 'saas интерфейс', q: 'saas product interface' },
+    { label: 'плотная таблица', q: 'data table dense ui' },
+    { label: 'настройки', q: 'settings page design' },
+    { label: 'онбординг', q: 'onboarding flow' },
+    { label: 'empty state', q: 'empty state ui' },
+    { label: 'уведомления', q: 'notification design pattern' },
+    { label: 'command palette', q: 'command palette ui' },
+    { label: 'sidebar', q: 'sidebar navigation' },
+    { label: 'pricing saas', q: 'pricing page saas' },
+    { label: 'crm', q: 'crm interface' },
+    { label: 'email клиент', q: 'email client design' },
+    { label: 'календарь', q: 'calendar app design' },
+    { label: 'заметки', q: 'notes app design' },
+    { label: 'kanban', q: 'kanban board design' },
+    { label: 'wiki', q: 'wiki interface design' },
+    { label: 'code editor', q: 'code editor ui' },
+    { label: 'terminal', q: 'terminal aesthetic ui' },
+    { label: 'dev tools', q: 'dev tools dashboard' },
   ],
   'мобайл': [
     // Базовые паттерны
-    { label: 'ios', q: 'ios app design iphone screen' },
-    { label: 'android material', q: 'android material you 3 screen' },
-    { label: 'mobile onboarding', q: 'mobile onboarding splash screens' },
-    { label: 'bottom sheet', q: 'bottom sheet pattern modal drawer' },
-    { label: 'tab bar', q: 'tab bar design navigation mobile' },
-    { label: 'жесты', q: 'gesture interaction swipe drag' },
-    { label: 'fintech', q: 'fintech mobile ui banking screens' },
-    { label: 'health', q: 'health app design fitness tracker' },
-    { label: 'music app', q: 'music app interface spotify apple music' },
-    { label: 'swipe', q: 'swipe interaction card stack tinder' },
+    { label: 'ios', q: 'ios app design' },
+    { label: 'android material', q: 'android material you' },
+    { label: 'mobile onboarding', q: 'mobile onboarding' },
+    { label: 'bottom sheet', q: 'bottom sheet pattern' },
+    { label: 'tab bar', q: 'tab bar design' },
+    { label: 'жесты', q: 'gesture interaction' },
+    { label: 'fintech', q: 'fintech mobile ui' },
+    { label: 'health', q: 'health app design' },
+    { label: 'music app', q: 'music app interface' },
+    { label: 'swipe', q: 'swipe interaction' },
     // Свежие фичи 2025–26
-    { label: 'dynamic island', q: 'dynamic island design notch interaction' },
-    { label: 'live activity', q: 'live activity ios lock screen' },
-    { label: 'widget ios 17', q: 'widget design ios 17 home screen' },
-    { label: 'lock screen widget', q: 'lock screen widget design ios 17' },
-    { label: 'haptic feedback', q: 'haptic feedback ui tactile mobile' },
-    { label: 'material expressive', q: 'material expressive design android 14' },
-    { label: 'ios 18 controls', q: 'ios 18 controls control center' },
-    { label: 'pull to refresh', q: 'pull to refresh creative animation gesture' },
+    { label: 'dynamic island', q: 'dynamic island design' },
+    { label: 'live activity', q: 'live activity ios' },
+    { label: 'widget ios 17', q: 'widget design ios 17' },
+    { label: 'lock screen widget', q: 'lock screen widget design' },
+    { label: 'haptic feedback', q: 'haptic feedback ui' },
+    { label: 'material expressive', q: 'material expressive design' },
+    { label: 'ios 18 controls', q: 'ios 18 controls' },
+    { label: 'pull to refresh', q: 'pull to refresh creative' },
   ],
   'лендинг': [
-    { label: 'hero 2025', q: 'landing page hero 2025 minimal big type' },
-    { label: 'marketing saas', q: 'marketing site saas b2b homepage' },
-    { label: 'saas homepage', q: 'saas homepage b2b screenshot' },
-    { label: 'startup brand', q: 'startup brand site minimal hero' },
-    { label: 'студия', q: 'studio portfolio site agency creative' },
-    { label: 'features', q: 'feature section design landing block' },
-    { label: 'отзывы', q: 'testimonial section landing block quote' },
-    { label: 'footer', q: 'footer design website large' },
-    { label: 'pricing', q: 'pricing comparison three tier table' },
-    { label: 'waitlist', q: 'waitlist landing email signup hero' },
-    { label: 'developer tool', q: 'developer tool homepage technical b2b' },
-    { label: 'b2b enterprise', q: 'b2b enterprise homepage corporate site' },
-    { label: 'агентство', q: 'agency website design creative studio' },
-    { label: 'e-commerce 2025', q: 'e-commerce homepage 2025 shop fashion minimal' },
-    { label: 'one-pager', q: 'portfolio one-pager scroll designer' },
-    { label: 'product hunt', q: 'product hunt launch design saas' },
-    { label: 'app store', q: 'app store landing page ios download' },
-    { label: 'crypto site', q: 'crypto project site web3 dark' },
-    { label: 'nft marketplace', q: 'nft marketplace landing opensea-like' },
-    { label: 'web3 wallet', q: 'web3 wallet site metamask-like' },
+    { label: 'hero 2025', q: 'landing page hero 2025' },
+    { label: 'marketing saas', q: 'marketing site saas' },
+    { label: 'saas homepage', q: 'saas homepage' },
+    { label: 'startup brand', q: 'startup brand site' },
+    { label: 'студия', q: 'studio portfolio site' },
+    { label: 'features', q: 'feature section design' },
+    { label: 'отзывы', q: 'testimonial section' },
+    { label: 'footer', q: 'footer design' },
+    { label: 'pricing', q: 'pricing comparison' },
+    { label: 'waitlist', q: 'waitlist landing' },
+    { label: 'developer tool', q: 'developer tool homepage' },
+    { label: 'b2b enterprise', q: 'b2b enterprise homepage' },
+    { label: 'агентство', q: 'agency website design' },
+    { label: 'e-commerce 2025', q: 'e-commerce homepage 2025' },
+    { label: 'one-pager', q: 'portfolio one-pager' },
+    { label: 'product hunt', q: 'product hunt launch design' },
+    { label: 'app store', q: 'app store landing page' },
+    { label: 'crypto site', q: 'crypto project site' },
+    { label: 'nft marketplace', q: 'nft marketplace landing' },
+    { label: 'web3 wallet', q: 'web3 wallet site' },
   ],
   'типографика': [
-    { label: 'editorial web', q: 'editorial web design serif magazine' },
-    { label: 'крупный hero', q: 'big typography hero landing' },
-    { label: 'serif web', q: 'serif typography web editorial reading' },
-    { label: 'variable font', q: 'variable font web animation' },
-    { label: 'text layout', q: 'text layout design web reading' },
-    { label: 'swiss web', q: 'swiss design web grid helvetica' },
-    { label: 'magazine digital', q: 'magazine layout digital editorial spread' },
-    { label: 'type specimen', q: 'type specimen foundry display' },
-    { label: 'pull quote', q: 'pull quote design editorial article' },
-    { label: 'long form', q: 'long form reading medium article' },
+    { label: 'editorial web', q: 'editorial web design' },
+    { label: 'крупный hero', q: 'big typography hero' },
+    { label: 'serif web', q: 'serif typography web' },
+    { label: 'variable font', q: 'variable font web' },
+    { label: 'text layout', q: 'text layout design' },
+    { label: 'swiss web', q: 'swiss design web' },
+    { label: 'magazine digital', q: 'magazine layout digital' },
+    { label: 'type specimen', q: 'type specimen' },
+    { label: 'pull quote', q: 'pull quote design' },
+    { label: 'long form', q: 'long form reading' },
   ],
   'бренд': [
-    { label: 'идентика 2024', q: 'brand identity 2024 case study' },
-    { label: 'logo 2025', q: 'logo design 2025 minimal behance' },
-    { label: 'guidelines', q: 'brand guidelines book visual identity' },
-    { label: 'wordmark', q: 'wordmark logo tech startup' },
-    { label: 'monogram', q: 'monogram design brand identity' },
-    { label: 'rebrand', q: 'rebrand case study before after' },
-    { label: 'brand color', q: 'brand color palette identity system' },
-    { label: 'визитки', q: 'business card design minimal modern' },
-    { label: 'studio identity', q: 'design studio identity agency' },
-    { label: 'tech logo', q: 'tech startup logo minimal sans' },
+    { label: 'идентика 2024', q: 'brand identity 2024' },
+    { label: 'logo 2025', q: 'logo design 2025 minimal' },
+    { label: 'guidelines', q: 'brand guidelines book' },
+    { label: 'wordmark', q: 'wordmark logo' },
+    { label: 'monogram', q: 'monogram design' },
+    { label: 'rebrand', q: 'rebrand case study' },
+    { label: 'brand color', q: 'brand color palette' },
+    { label: 'визитки', q: 'business card design' },
+    { label: 'studio identity', q: 'design studio identity' },
+    { label: 'tech logo', q: 'tech startup logo' },
   ],
   'моушн / 3d': [
-    { label: 'webgl', q: 'webgl experiment portfolio awwwards' },
-    { label: 'three.js', q: 'three.js portfolio website 3d hero' },
-    { label: 'creative coding', q: 'creative coding web generative' },
-    { label: 'scroll animation', q: 'scroll animation web parallax' },
-    { label: 'cursor', q: 'cursor interaction website custom' },
-    { label: '3d hero', q: '3d hero section awwwards landing' },
-    { label: 'motion ui', q: 'motion design ui pattern micro interaction' },
-    { label: 'micro animation', q: 'micro animation ui button transition' },
-    { label: 'page transition', q: 'page transition design smooth website' },
-    { label: 'interactive landing', q: 'interactive landing awwwards experimental' },
+    { label: 'webgl', q: 'webgl experiment portfolio' },
+    { label: 'three.js', q: 'three.js portfolio website' },
+    { label: 'creative coding', q: 'creative coding web' },
+    { label: 'scroll animation', q: 'scroll animation web' },
+    { label: 'cursor', q: 'cursor interaction website' },
+    { label: '3d hero', q: '3d hero section' },
+    { label: 'motion ui', q: 'motion design ui pattern' },
+    { label: 'micro animation', q: 'micro animation ui' },
+    { label: 'page transition', q: 'page transition design' },
+    { label: 'interactive landing', q: 'interactive landing' },
   ],
   'ai-эпоха': [
-    { label: 'chat interface', q: 'ai chat interface 2025 chatgpt streaming' },
-    { label: 'prompt input', q: 'prompt input design chat textarea' },
-    { label: 'streaming response', q: 'streaming response ui chatgpt typing' },
-    { label: 'assistant sidebar', q: 'ai assistant sidebar cursor zed' },
-    { label: 'citations', q: 'citation ui pattern perplexity' },
-    { label: 'multimodal input', q: 'multimodal input ui image upload chat' },
-    { label: 'agent workflow', q: 'agent workflow ui steps chain' },
-    { label: 'generated cards', q: 'generated content card ai output' },
+    { label: 'chat interface', q: 'ai chat interface 2025' },
+    { label: 'prompt input', q: 'prompt input design' },
+    { label: 'streaming response', q: 'streaming response ui' },
+    { label: 'assistant sidebar', q: 'ai assistant sidebar' },
+    { label: 'citations', q: 'citation ui pattern' },
+    { label: 'multimodal input', q: 'multimodal input ui' },
+    { label: 'agent workflow', q: 'agent workflow ui' },
+    { label: 'generated cards', q: 'generated content card' },
   ],
   'данные': [
-    { label: 'data viz 2024', q: 'data visualization 2024 minimal dashboard' },
-    { label: 'analytics', q: 'analytics dashboard ui saas product' },
-    { label: 'минимальные графики', q: 'chart design minimal sparkline financial' },
-    { label: 'fintech', q: 'financial dashboard ui trading screen' },
-    { label: 'metric card', q: 'metric card ui kpi dashboard' },
-    { label: 'pricing chart', q: 'pricing chart design saas comparison' },
-    { label: 'граф', q: 'network graph visualization d3 nodes' },
-    { label: 'таймлайн', q: 'timeline visualization horizontal events' },
-    { label: 'карты', q: 'map data overlay mapbox dashboard' },
-    { label: 'sparkline', q: 'table sparkline trend metric' },
+    { label: 'data viz 2024', q: 'data visualization 2024' },
+    { label: 'analytics', q: 'analytics dashboard ui' },
+    { label: 'минимальные графики', q: 'chart design minimal' },
+    { label: 'fintech', q: 'financial dashboard ui' },
+    { label: 'metric card', q: 'metric card ui' },
+    { label: 'pricing chart', q: 'pricing chart design' },
+    { label: 'граф', q: 'network graph visualization' },
+    { label: 'таймлайн', q: 'timeline visualization' },
+    { label: 'карты', q: 'map data overlay' },
+    { label: 'sparkline', q: 'table sparkline' },
   ],
   'ретро': [
-    { label: 'macintosh', q: 'early macintosh interface system 1' },
-    { label: 'ios 6', q: 'skeuomorphism ios 6 scott forstall' },
-    { label: 'win xp', q: 'windows xp design luna bliss' },
-    { label: 'geocities', q: 'geocities web design retro 90s html' },
-    { label: 'web 1.0', q: 'web 1.0 design tables frames' },
-    { label: 'flash era', q: 'flash era interface 2000s navigation' },
-    { label: 'aqua', q: 'apple aqua ui mac os x' },
-    { label: 'ipod nano', q: 'ipod nano interface click wheel' },
-    { label: 'pixel ui', q: 'pixel art ui bitmap game' },
-    { label: 'teletext', q: 'teletext design retro ceefax bbc' },
+    { label: 'macintosh', q: 'early macintosh interface' },
+    { label: 'ios 6', q: 'skeuomorphism ios 6' },
+    { label: 'win xp', q: 'windows xp design' },
+    { label: 'geocities', q: 'geocities web design retro' },
+    { label: 'web 1.0', q: 'web 1.0 design' },
+    { label: 'flash era', q: 'flash era interface' },
+    { label: 'aqua', q: 'apple aqua ui' },
+    { label: 'ipod nano', q: 'ipod nano interface' },
+    { label: 'pixel ui', q: 'pixel art ui' },
+    { label: 'teletext', q: 'teletext design retro' },
   ],
   'визуальные стили': [
-    { label: 'swiss poster', q: 'swiss design poster helvetica grid' },
-    { label: 'brutalist', q: 'brutalist web design raw text' },
-    { label: 'y2k', q: 'y2k aesthetic design chrome metallic' },
-    { label: 'glass', q: 'glassmorphism ui frosted blur' },
-    { label: 'neumorphism', q: 'neumorphism design soft shadow' },
-    { label: 'risograph', q: 'risograph print overlay duotone' },
-    { label: 'bauhaus', q: 'bauhaus design web geometric primary' },
-    { label: 'memphis', q: 'memphis design pattern 80s shapes' },
-    { label: 'vaporwave', q: 'vaporwave aesthetic 90s nostalgia' },
-    { label: 'minimal', q: 'minimalism design web whitespace serif' },
+    { label: 'swiss poster', q: 'swiss design poster' },
+    { label: 'brutalist', q: 'brutalist web design' },
+    { label: 'y2k', q: 'y2k aesthetic design' },
+    { label: 'glass', q: 'glassmorphism ui' },
+    { label: 'neumorphism', q: 'neumorphism design' },
+    { label: 'risograph', q: 'risograph print' },
+    { label: 'bauhaus', q: 'bauhaus design web' },
+    { label: 'memphis', q: 'memphis design pattern' },
+    { label: 'vaporwave', q: 'vaporwave aesthetic' },
+    { label: 'minimal', q: 'minimalism design web' },
   ],
   'indie / craft': [
-    { label: 'indie maker', q: 'indie maker website solo developer' },
-    { label: 'личный блог', q: 'personal blog design minimal writer site' },
-    { label: 'портфолио 2024', q: 'designer portfolio 2024 minimal awwwards' },
-    { label: 'studio craft', q: 'studio website craft small studio' },
-    { label: 'handmade', q: 'handmade web design craft personal' },
-    { label: 'are.na вдохновение', q: 'are.na inspired website moodboard' },
-    { label: 'digital garden', q: 'digital garden site obsidian knowledge' },
-    { label: 'zine', q: 'zine web design print-inspired' },
-    { label: 'small studio', q: 'small studio brand identity craft' },
-    { label: 'notion editor', q: 'notion-like editor block-based document' },
+    { label: 'indie maker', q: 'indie maker website' },
+    { label: 'личный блог', q: 'personal blog design minimal' },
+    { label: 'портфолио 2024', q: 'designer portfolio 2024' },
+    { label: 'studio craft', q: 'studio website craft' },
+    { label: 'handmade', q: 'handmade web design' },
+    { label: 'are.na вдохновение', q: 'are.na inspired website' },
+    { label: 'digital garden', q: 'digital garden site' },
+    { label: 'zine', q: 'zine web design' },
+    { label: 'small studio', q: 'small studio brand' },
+    { label: 'notion editor', q: 'notion-like editor' },
   ],
   'веб-эстетика': [
-    { label: 'bento grid', q: 'bento grid landing layout' },
-    { label: 'liquid metal', q: 'liquid metal hero chrome animation' },
-    { label: 'oversized cursor', q: 'oversized cursor custom interaction' },
-    { label: 'noise texture', q: 'noise texture web grain background' },
-    { label: 'monospace web', q: 'monospace web design terminal style' },
-    { label: 'parallax storytelling', q: 'parallax storytelling scroll narrative' },
-    { label: 'gradient mesh', q: 'gradient mesh smooth colorful' },
-    { label: 'wireframe', q: 'wireframe aesthetic low-fi web' },
-    { label: 'terminal in browser', q: 'terminal in browser shell ui' },
-    { label: 'dithering retro', q: 'dithering retro web bitmap halftone' },
-    { label: 'bw editorial', q: 'bw editorial design magazine print' },
+    { label: 'bento grid', q: 'bento grid' },
+    { label: 'liquid metal', q: 'liquid metal hero' },
+    { label: 'oversized cursor', q: 'oversized cursor' },
+    { label: 'noise texture', q: 'noise texture web' },
+    { label: 'monospace web', q: 'monospace web design' },
+    { label: 'parallax storytelling', q: 'parallax storytelling' },
+    { label: 'gradient mesh', q: 'gradient mesh' },
+    { label: 'wireframe', q: 'wireframe aesthetic' },
+    { label: 'terminal in browser', q: 'terminal in browser' },
+    { label: 'dithering retro', q: 'dithering retro web' },
+    { label: 'bw editorial', q: 'bw editorial design' },
   ],
   'email и newsletter': [
-    { label: 'substack', q: 'newsletter design substack writer publication' },
-    { label: 'transactional', q: 'transactional email design template clean' },
-    { label: 'welcome', q: 'welcome email design onboarding sequence' },
-    { label: 'pricing email', q: 'pricing email template upgrade saas' },
-    { label: 'digest', q: 'digest email layout summary weekly' },
-    { label: 'marketing template', q: 'marketing email template campaign promo' },
-    { label: 'signature', q: 'email signature design minimal corporate' },
-    { label: 'abandoned cart', q: 'abandoned cart email ecommerce template' },
-    { label: 'password reset', q: 'password reset email transactional auth' },
-    { label: 'verification', q: 'account verification email otp magic link' },
+    { label: 'substack', q: 'newsletter design substack' },
+    { label: 'transactional', q: 'transactional email design' },
+    { label: 'welcome', q: 'welcome email design' },
+    { label: 'pricing email', q: 'pricing email template' },
+    { label: 'digest', q: 'digest email layout' },
+    { label: 'marketing template', q: 'marketing email template' },
+    { label: 'signature', q: 'email signature design' },
+    { label: 'abandoned cart', q: 'abandoned cart email' },
+    { label: 'password reset', q: 'password reset email' },
+    { label: 'verification', q: 'account verification email' },
   ],
   'onboarding': [
-    { label: 'tour overlay', q: 'tour overlay design tooltip walkthrough' },
-    { label: 'feature spotlight', q: 'feature spotlight ui what is new' },
-    { label: 'progress checklist', q: 'progress checklist ui getting started' },
-    { label: 'welcome modal', q: 'welcome modal design first time' },
-    { label: 'permission request', q: 'permission request screen ios prompt' },
-    { label: 'connect integration', q: 'connect integration ui oauth flow' },
-    { label: 'import data', q: 'import data flow csv mapping' },
-    { label: 'team invite', q: 'team invite screen workspace setup' },
-    { label: 'setup wizard', q: 'setup wizard design stepper flow' },
-    { label: 'empty state onboarding', q: 'empty state onboarding first time illustration' },
+    { label: 'tour overlay', q: 'tour overlay design' },
+    { label: 'feature spotlight', q: 'feature spotlight ui' },
+    { label: 'progress checklist', q: 'progress checklist ui' },
+    { label: 'welcome modal', q: 'welcome modal design' },
+    { label: 'permission request', q: 'permission request screen' },
+    { label: 'connect integration', q: 'connect integration ui' },
+    { label: 'import data', q: 'import data flow' },
+    { label: 'team invite', q: 'team invite screen' },
+    { label: 'setup wizard', q: 'setup wizard design' },
+    { label: 'empty state onboarding', q: 'empty state onboarding' },
   ],
   'settings': [
-    { label: 'permission matrix', q: 'permission matrix ui role table' },
-    { label: 'role management', q: 'role management ui admin workspace' },
-    { label: 'api keys', q: 'api key management ui tokens developer' },
-    { label: 'webhooks', q: 'webhook settings ui integration api' },
-    { label: 'integrations', q: 'integration settings page apps connected' },
-    { label: 'notifications', q: 'notification preferences ui toggles email' },
-    { label: 'team management', q: 'team management page workspace members' },
-    { label: 'billing', q: 'billing portal ui subscription saas' },
-    { label: 'feature flags', q: 'feature flag ui launchdarkly toggle' },
-    { label: 'audit log', q: 'audit log ui design activity table' },
+    { label: 'permission matrix', q: 'permission matrix ui' },
+    { label: 'role management', q: 'role management ui' },
+    { label: 'api keys', q: 'api key management ui' },
+    { label: 'webhooks', q: 'webhook settings ui' },
+    { label: 'integrations', q: 'integration settings page' },
+    { label: 'notifications', q: 'notification preferences ui' },
+    { label: 'team management', q: 'team management page' },
+    { label: 'billing', q: 'billing portal ui' },
+    { label: 'feature flags', q: 'feature flag ui' },
+    { label: 'audit log', q: 'audit log ui design' },
   ],
   'internal tools': [
-    { label: 'retool', q: 'retool dashboard low-code admin' },
-    { label: 'admin panel', q: 'internal admin panel dashboard saas' },
-    { label: 'airtable', q: 'airtable interface design database grid' },
-    { label: 'notion db', q: 'notion-style db ui database view' },
-    { label: 'linear palette', q: 'linear command palette keyboard search' },
-    { label: 'figma plugin', q: 'figma plugin ui panel sidebar' },
-    { label: 'slack canvas', q: 'slack canvas design document chat' },
-    { label: 'cms', q: 'internal cms design content editor' },
-    { label: 'data ops', q: 'data ops tool ui pipeline monitoring' },
-    { label: 'qa testing', q: 'qa testing tool ui test runner' },
+    { label: 'retool', q: 'retool dashboard' },
+    { label: 'admin panel', q: 'internal admin panel' },
+    { label: 'airtable', q: 'airtable interface design' },
+    { label: 'notion db', q: 'notion-style db ui' },
+    { label: 'linear palette', q: 'linear command palette' },
+    { label: 'figma plugin', q: 'figma plugin ui' },
+    { label: 'slack canvas', q: 'slack canvas design' },
+    { label: 'cms', q: 'internal cms design' },
+    { label: 'data ops', q: 'data ops tool ui' },
+    { label: 'qa testing', q: 'qa testing tool ui' },
   ],
   'edu / learning': [
-    { label: 'course platform', q: 'course platform ui video lessons' },
-    { label: 'quiz', q: 'quiz design ui multiple choice' },
-    { label: 'flashcard', q: 'flashcard interface anki spaced' },
-    { label: 'progress', q: 'progress tracking edu learning dashboard' },
-    { label: 'certificate', q: 'certificate design ui achievement award' },
-    { label: 'lesson video', q: 'lesson video player ui player chapters' },
-    { label: 'study timer', q: 'study timer ui pomodoro focus' },
-    { label: 'language app', q: 'language app ui duolingo style' },
-    { label: 'coding tutorial', q: 'coding tutorial interface editor terminal' },
-    { label: 'learning path', q: 'learning path map roadmap journey' },
+    { label: 'course platform', q: 'course platform ui' },
+    { label: 'quiz', q: 'quiz design ui' },
+    { label: 'flashcard', q: 'flashcard interface' },
+    { label: 'progress', q: 'progress tracking edu' },
+    { label: 'certificate', q: 'certificate design ui' },
+    { label: 'lesson video', q: 'lesson video player ui' },
+    { label: 'study timer', q: 'study timer ui' },
+    { label: 'language app', q: 'language app ui' },
+    { label: 'coding tutorial', q: 'coding tutorial interface' },
+    { label: 'learning path', q: 'learning path map' },
   ],
   'finance': [
-    { label: 'mobile banking', q: 'mobile banking design card transactions' },
-    { label: 'crypto exchange', q: 'crypto exchange ui trading chart' },
-    { label: 'budgeting', q: 'budgeting app design categories spending' },
-    { label: 'expense tracker', q: 'expense tracker ui receipts categories' },
-    { label: 'invoice', q: 'invoice design ui pdf template' },
-    { label: 'payment confirm', q: 'payment confirmation ui checkout success' },
-    { label: 'transaction history', q: 'transaction history design list timeline' },
-    { label: 'card management', q: 'card management ui virtual debit' },
-    { label: 'subscriptions', q: 'subscription management ui recurring billing' },
-    { label: 'financial chart', q: 'financial chart design candle line' },
+    { label: 'mobile banking', q: 'mobile banking design' },
+    { label: 'crypto exchange', q: 'crypto exchange ui' },
+    { label: 'budgeting', q: 'budgeting app design' },
+    { label: 'expense tracker', q: 'expense tracker ui' },
+    { label: 'invoice', q: 'invoice design ui' },
+    { label: 'payment confirm', q: 'payment confirmation ui' },
+    { label: 'transaction history', q: 'transaction history design' },
+    { label: 'card management', q: 'card management ui' },
+    { label: 'subscriptions', q: 'subscription management ui' },
+    { label: 'financial chart', q: 'financial chart design' },
   ],
   'дизайн-документы': [
-    { label: 'design system docs', q: 'design system docs figma documentation' },
-    { label: 'figma file', q: 'figma file structure organized layers' },
-    { label: 'style guide', q: 'style guide page typography colors' },
-    { label: 'design tokens', q: 'design tokens ui variables system' },
-    { label: 'component library', q: 'component library docs storybook' },
-    { label: 'usage guidelines', q: 'usage guidelines page do dont examples' },
-    { label: 'brand book online', q: 'brand book online digital guidelines' },
-    { label: 'pattern library', q: 'pattern library design component catalog' },
-    { label: 'voice and tone', q: 'voice and tone docs writing principles' },
-    { label: 'accessibility', q: 'accessibility docs design wcag contrast' },
+    { label: 'design system docs', q: 'design system docs' },
+    { label: 'figma file', q: 'figma file structure' },
+    { label: 'style guide', q: 'style guide page' },
+    { label: 'design tokens', q: 'design tokens ui' },
+    { label: 'component library', q: 'component library docs' },
+    { label: 'usage guidelines', q: 'usage guidelines page' },
+    { label: 'brand book online', q: 'brand book online' },
+    { label: 'pattern library', q: 'pattern library design' },
+    { label: 'voice and tone', q: 'voice and tone docs' },
+    { label: 'accessibility', q: 'accessibility docs design' },
   ],
   'vintage tech': [
-    { label: 'apple ads', q: 'old apple ads design print 80s 90s' },
-    { label: 'palm pilot', q: 'palm pilot ui pda graffiti' },
-    { label: 'blackberry', q: 'blackberry interface qwerty keypad' },
-    { label: 'office 95', q: 'ms office 95 windows screenshot' },
-    { label: 'photoshop 3', q: 'photoshop 3 interface adobe vintage' },
-    { label: 'mac os 9', q: 'mac os 9 design platinum classic' },
-    { label: 'classic mac apps', q: 'classic mac apps system 7 screenshot' },
-    { label: 'win 3.1', q: 'windows 3.1 interface program manager' },
-    { label: 'dos game ui', q: 'dos game ui vga 320x200' },
-    { label: 'amiga workbench', q: 'amiga workbench os screenshot' },
+    { label: 'apple ads', q: 'old apple ads design' },
+    { label: 'palm pilot', q: 'palm pilot ui' },
+    { label: 'blackberry', q: 'blackberry interface' },
+    { label: 'office 95', q: 'ms office 95' },
+    { label: 'photoshop 3', q: 'photoshop 3 interface' },
+    { label: 'mac os 9', q: 'mac os 9 design' },
+    { label: 'classic mac apps', q: 'classic mac apps' },
+    { label: 'win 3.1', q: 'windows 3.1 interface' },
+    { label: 'dos game ui', q: 'dos game ui' },
+    { label: 'amiga workbench', q: 'amiga workbench' },
   ],
   'против хайпа': [
-    { label: 'newspaper', q: 'newspaper inspired design text grid' },
-    { label: 'library catalog', q: 'library catalog ui index card minimal' },
-    { label: 'paper form', q: 'paper form digital tax minimal' },
-    { label: 'telegram simple', q: 'telegram ui simple minimalist chat' },
-    { label: 'craigslist', q: 'craigslist aesthetic plain text classifieds' },
-    { label: 'hacker news', q: 'hacker news design orange yellow text' },
-    { label: 'drudge', q: 'drudge report style headlines minimal' },
-    { label: 'plain text', q: 'plain text web no css document' },
-    { label: 'links2', q: 'links2 browser aesthetic terminal browser' },
-    { label: 'lynx', q: 'lynx aesthetic text only' },
+    { label: 'newspaper', q: 'newspaper inspired design' },
+    { label: 'library catalog', q: 'library catalog ui' },
+    { label: 'paper form', q: 'paper form digital' },
+    { label: 'telegram simple', q: 'telegram ui simple' },
+    { label: 'craigslist', q: 'craigslist aesthetic' },
+    { label: 'hacker news', q: 'hacker news design' },
+    { label: 'drudge', q: 'drudge report style' },
+    { label: 'plain text', q: 'plain text web' },
+    { label: 'links2', q: 'links2 browser aesthetic' },
+    { label: 'lynx', q: 'lynx aesthetic' },
   ],
   'award winners': [
-    { label: 'adc', q: 'adc award winner design art directors club' },
-    { label: 'd&ad', q: 'd&ad award design pencil winner' },
-    { label: 'type directors', q: 'type directors club tdc winner' },
-    { label: 'brand new', q: 'brand new approved underconsideration logo' },
-    { label: 'communication arts', q: 'communication arts award ca annual' },
-    { label: 'awwwards soty', q: 'awwwards site of the year webdesign winner' },
-    { label: 'css design awards', q: 'css design awards winner cssda' },
-    { label: 'fwa', q: 'fwa winner site favourite website awards' },
-    { label: 'european design', q: 'european design awards eda' },
-    { label: 'art directors', q: 'art directors club adc nyc' },
+    { label: 'adc', q: 'adc award winner design' },
+    { label: 'd&ad', q: 'd&ad award design' },
+    { label: 'type directors', q: 'type directors club' },
+    { label: 'brand new', q: 'brand new approved' },
+    { label: 'communication arts', q: 'communication arts award' },
+    { label: 'awwwards soty', q: 'awwwards site of the year' },
+    { label: 'css design awards', q: 'css design awards winner' },
+    { label: 'fwa', q: 'fwa winner site' },
+    { label: 'european design', q: 'european design awards' },
+    { label: 'art directors', q: 'art directors club' },
   ],
 };
 
@@ -4213,189 +4176,189 @@ const SPECIAL_CATEGORIES_DESIGNER = new Set(['vintage tech', 'против ха�
 const CATEGORIES_AESTHETIC = {
   'утренний свет': [
     { label: 'окно утром', q: 'morning light interior' },
-    { label: 'кухня в солнце', q: 'sunlit kitchen warm interior' },
-    { label: 'занавески', q: 'curtains morning linen sunlight' },
-    { label: 'свет в листве', q: 'light through leaves dappled shadow' },
-    { label: 'завтрак на солнце', q: 'breakfast table sunlight coffee croissant' },
-    { label: 'золотой час', q: 'golden hour interior warm window' },
-    { label: 'луч на стене', q: 'sunbeam on wall empty room' },
-    { label: 'пылинки в свете', q: 'dust in sunlight ray particles' },
-    { label: 'окно с растениями', q: 'window plants morning silhouette green' },
-    { label: 'тихое утро', q: 'quiet morning home minimal bedroom' },
+    { label: 'кухня в солнце', q: 'sunlit kitchen' },
+    { label: 'занавески', q: 'curtains morning' },
+    { label: 'свет в листве', q: 'light through leaves' },
+    { label: 'завтрак на солнце', q: 'breakfast table sunlight' },
+    { label: 'золотой час', q: 'golden hour interior' },
+    { label: 'луч на стене', q: 'sunbeam on wall' },
+    { label: 'пылинки в свете', q: 'dust in sunlight' },
+    { label: 'окно с растениями', q: 'window plants morning' },
+    { label: 'тихое утро', q: 'quiet morning home' },
   ],
   'неспешные вещи': [
-    { label: 'quiet luxury', q: 'quiet luxury aesthetic beige minimalist' },
-    { label: 'кашемир', q: 'cashmere texture neutral knit closeup' },
-    { label: 'льняная скатерть', q: 'linen tablecloth table natural' },
-    { label: 'ручная керамика', q: 'handmade ceramics clay minimal earthy' },
-    { label: 'винтажные часы', q: 'vintage watch detail patek philippe macro' },
-    { label: 'кожаная патина', q: 'leather patina aged worn texture' },
-    { label: 'ваби-саби', q: 'wabi sabi pottery japanese imperfect' },
-    { label: 'slow design', q: 'slow design objects artisan minimal' },
-    { label: 'нейтральный интерьер', q: 'neutral palette interior beige cream room' },
-    { label: 'ремесленник', q: 'artisan craft workshop hands tools' },
+    { label: 'quiet luxury', q: 'quiet luxury aesthetic' },
+    { label: 'кашемир', q: 'cashmere texture' },
+    { label: 'льняная скатерть', q: 'linen tablecloth' },
+    { label: 'ручная керамика', q: 'handmade ceramics' },
+    { label: 'винтажные часы', q: 'vintage watch detail' },
+    { label: 'кожаная патина', q: 'leather patina' },
+    { label: 'ваби-саби', q: 'wabi sabi pottery' },
+    { label: 'slow design', q: 'slow design objects' },
+    { label: 'нейтральный интерьер', q: 'neutral palette interior' },
+    { label: 'ремесленник', q: 'artisan craft' },
   ],
   'другая жизнь': [
-    { label: 'итальянская квартира', q: 'italian apartment interior apartamento magazine' },
-    { label: 'парижская кухня', q: 'parisian kitchen haussmann small' },
-    { label: 'японская веранда', q: 'japanese veranda minka engawa wood' },
-    { label: 'скандинавская гостиная', q: 'scandinavian living room minimal nordic light' },
-    { label: 'мехико-сити', q: 'mexico city home luis barragan colorful' },
-    { label: 'студия художника', q: 'cozy creative studio artist atelier paint' },
-    { label: 'квартира живописца', q: 'painters apartment artist home interior' },
+    { label: 'итальянская квартира', q: 'italian apartment interior' },
+    { label: 'парижская кухня', q: 'parisian kitchen' },
+    { label: 'японская веранда', q: 'japanese veranda' },
+    { label: 'скандинавская гостиная', q: 'scandinavian living room' },
+    { label: 'мехико-сити', q: 'mexico city home' },
+    { label: 'студия художника', q: 'cozy creative studio' },
+    { label: 'квартира живописца', q: 'painters apartment' },
     { label: 'дом художника', q: 'artist home interior' },
-    { label: 'обжитое пространство', q: 'lived in space messy real apartment' },
-    { label: 'real homes', q: 'real homes magazine apartamento cereal' },
+    { label: 'обжитое пространство', q: 'lived in space' },
+    { label: 'real homes', q: 'real homes magazine' },
   ],
   'носители времени': [
-    { label: 'находки', q: 'flea market finds paris brocante objects' },
-    { label: 'винтажная керамика', q: 'vintage ceramics stoneware earthy' },
-    { label: 'mid-century мебель', q: 'mid century furniture teak danish 60s' },
-    { label: 'советский фарфор', q: 'soviet porcelain ломоносовский lfz' },
-    { label: 'скандинавское дерево', q: 'scandinavian wood objects teak handcrafted' },
-    { label: 'японский чайник', q: 'japanese teapot vintage kyusu cast iron' },
-    { label: 'антиквариат', q: 'antique market objects flea finds tabletop' },
-    { label: 'brocante', q: 'brocante finds paris vintage objects' },
-    { label: 'винтажная ткань', q: 'vintage textile fabric pattern indigo' },
-    { label: 'старая книжная', q: 'old book shop interior shelves dusty paris' },
+    { label: 'находки', q: 'flea market finds' },
+    { label: 'винтажная керамика', q: 'vintage ceramics' },
+    { label: 'mid-century мебель', q: 'mid century furniture' },
+    { label: 'советский фарфор', q: 'soviet porcelain' },
+    { label: 'скандинавское дерево', q: 'scandinavian wood objects' },
+    { label: 'японский чайник', q: 'japanese teapot vintage' },
+    { label: 'антиквариат', q: 'antique market objects' },
+    { label: 'brocante', q: 'brocante finds' },
+    { label: 'винтажная ткань', q: 'vintage textile' },
+    { label: 'старая книжная', q: 'old book shop interior' },
   ],
   'чистая форма': [
-    { label: 'минимализм', q: 'minimalist architecture tadao ando concrete' },
-    { label: 'ad reinhardt', q: 'ad reinhardt painting black square abstract' },
-    { label: 'буржуа', q: 'louise bourgeois sculpture spider maman' },
-    { label: 'тадао андо', q: 'tadao ando concrete church of light' },
-    { label: 'agnes martin', q: 'agnes martin grid pencil graph painting' },
-    { label: 'donald judd', q: 'donald judd stacks minimalism' },
-    { label: 'белая комната', q: 'white room art gallery minimalist installation' },
-    { label: 'японский минимализм', q: 'japanese minimalism muji wabi sabi' },
-    { label: 'брутализм', q: 'brutalism aesthetic concrete raw architecture' },
-    { label: 'монохром', q: 'monochrome composition black white minimal' },
+    { label: 'минимализм', q: 'minimalist architecture' },
+    { label: 'ad reinhardt', q: 'ad reinhardt painting' },
+    { label: 'буржуа', q: 'louise bourgeois sculpture' },
+    { label: 'тадао андо', q: 'tadao ando concrete' },
+    { label: 'agnes martin', q: 'agnes martin grid' },
+    { label: 'donald judd', q: 'donald judd' },
+    { label: 'белая комната', q: 'white room art' },
+    { label: 'японский минимализм', q: 'japanese minimalism' },
+    { label: 'брутализм', q: 'brutalism aesthetic' },
+    { label: 'монохром', q: 'monochrome composition' },
   ],
   'кадры из кино': [
-    { label: 'wong kar wai', q: 'wong kar wai film stills in the mood for love' },
-    { label: 'antonioni', q: 'antonioni cinematography la notte avventura' },
-    { label: 'каурисмяки', q: 'kaurismaki film aki finnish color' },
-    { label: 'sofia coppola', q: 'sofia coppola stills marie antoinette virgin suicides' },
-    { label: 'sorrentino', q: 'paolo sorrentino frames great beauty youth' },
-    { label: 'lynne ramsay', q: 'lynne ramsay film we need to talk about kevin' },
-    { label: 'malick', q: 'terrence malick light tree of life days of heaven' },
-    { label: 'mid-century кино', q: 'mid century film stills 50s 60s technicolor' },
-    { label: 'европейское 70-х', q: 'european cinema 70s tarkovsky truffaut' },
-    { label: 'японская новая волна', q: 'japanese new wave film ozu mizoguchi naruse' },
+    { label: 'wong kar wai', q: 'wong kar wai film stills' },
+    { label: 'antonioni', q: 'antonioni cinematography' },
+    { label: 'каурисмяки', q: 'kaurismaki film' },
+    { label: 'sofia coppola', q: 'sofia coppola stills' },
+    { label: 'sorrentino', q: 'paolo sorrentino frames' },
+    { label: 'lynne ramsay', q: 'lynne ramsay film' },
+    { label: 'malick', q: 'terrence malick light' },
+    { label: 'mid-century кино', q: 'mid century film stills' },
+    { label: 'европейское 70-х', q: 'european cinema 70s' },
+    { label: 'японская новая волна', q: 'japanese new wave film' },
   ],
   'стол накрыт': [
-    { label: 'после ужина', q: 'dinner table after candles plates leftover' },
-    { label: 'сезонные фрукты', q: 'fruits in season still life market produce' },
-    { label: 'рынок италии', q: 'italian market produce vegetables crates' },
-    { label: 'кухонная сцена', q: 'kitchen scene painting chardin vermeer' },
-    { label: 'skye gyngell', q: 'skye gyngell food chef restaurant petersham' },
-    { label: 'cabana table', q: 'cabana table setting magazine cluttered' },
-    { label: 'завтрак в италии', q: 'breakfast in italy espresso pastry morning' },
-    { label: 'сырная доска', q: 'cheese board minimal styling' },
-    { label: 'простая трапеза', q: 'simple meal photography rustic peasant' },
-    { label: 'осенний урожай', q: 'harvest table autumn pumpkin fall produce' },
+    { label: 'после ужина', q: 'dinner table after' },
+    { label: 'сезонные фрукты', q: 'fruits in season still life' },
+    { label: 'рынок италии', q: 'italian market produce' },
+    { label: 'кухонная сцена', q: 'kitchen scene painting' },
+    { label: 'skye gyngell', q: 'skye gyngell food' },
+    { label: 'cabana table', q: 'cabana table setting' },
+    { label: 'завтрак в италии', q: 'breakfast in italy' },
+    { label: 'сырная доска', q: 'cheese board minimal' },
+    { label: 'простая трапеза', q: 'simple meal photography' },
+    { label: 'осенний урожай', q: 'harvest table autumn' },
   ],
   'дикое и зелёное': [
-    { label: 'derek jarman', q: 'derek jarman garden prospect cottage dungeness' },
-    { label: 'икебана', q: 'japanese garden ikebana flower arrangement zen' },
-    { label: 'дикий луг', q: 'wild flower meadow summer field grasses' },
-    { label: 'ботанические', q: 'botanical illustration vintage herbarium drawing' },
-    { label: 'итальянская терраса', q: 'italian garden terrace tuscan villa lemon' },
-    { label: 'огород', q: 'kitchen garden potager vegetables raised bed' },
-    { label: 'старые семена', q: 'vintage seed packet illustration design' },
-    { label: 'листья в банке', q: 'leaves in glass jar foraged still life' },
-    { label: 'монастырский сад', q: 'monastery garden cloister herbs' },
-    { label: 'фуражинг', q: 'foraging plants wild edible mushroom' },
+    { label: 'derek jarman', q: 'derek jarman garden' },
+    { label: 'икебана', q: 'japanese garden ikebana' },
+    { label: 'дикий луг', q: 'wild flower meadow' },
+    { label: 'ботанические', q: 'botanical illustration vintage' },
+    { label: 'итальянская терраса', q: 'italian garden terrace' },
+    { label: 'огород', q: 'kitchen garden potager' },
+    { label: 'старые семена', q: 'vintage seed packet' },
+    { label: 'листья в банке', q: 'leaves in glass jar' },
+    { label: 'монастырский сад', q: 'monastery garden' },
+    { label: 'фуражинг', q: 'foraging plants' },
   ],
   'печатное': [
-    { label: 'ECM', q: 'ecm records covers jazz manfred eicher' },
-    { label: 'blue note', q: 'blue note jazz covers reid miles francis wolff' },
-    { label: 'японский винил', q: 'japanese vinyl design city pop ymo' },
-    { label: 'saul bass', q: 'saul bass posters film title minimalist' },
-    { label: 'penguin books', q: 'penguin books covers classics tschichold' },
-    { label: 'классическая музыка', q: 'classical music covers deutsche grammophon' },
-    { label: 'советские пластинки', q: 'soviet record sleeves ussr melodiya' },
-    { label: 'factory records', q: 'factory records design peter saville joy division' },
-    { label: 'бразильский джаз', q: 'brazilian jazz vinyl bossa nova jobim' },
-    { label: 'bauhaus poster', q: 'bauhaus poster herbert bayer schmidt' },
+    { label: 'ECM', q: 'ecm records covers' },
+    { label: 'blue note', q: 'blue note jazz covers' },
+    { label: 'японский винил', q: 'japanese vinyl design' },
+    { label: 'saul bass', q: 'saul bass posters' },
+    { label: 'penguin books', q: 'penguin books covers' },
+    { label: 'классическая музыка', q: 'classical music covers' },
+    { label: 'советские пластинки', q: 'soviet record sleeves' },
+    { label: 'factory records', q: 'factory records design' },
+    { label: 'бразильский джаз', q: 'brazilian jazz vinyl' },
+    { label: 'bauhaus poster', q: 'bauhaus poster' },
   ],
   'у воды': [
     // Слиты: «вода и тишина» (бассейны/онсэн/пруды) + «рассвет на воде» (туман/причалы)
-    { label: 'hockney pools', q: 'david hockney pools a bigger splash' },
-    { label: 'онсэн', q: 'japanese onsen ryokan steaming bath' },
-    { label: 'дождь в окно', q: 'rain on window droplets blur' },
-    { label: 'инфинити-бассейн', q: 'infinity pool minimal resort edge' },
-    { label: 'фьорд', q: 'scandinavian fjord norway misty cliffs' },
-    { label: 'крытый бассейн', q: 'indoor swimming pool tiles deserted geometric' },
-    { label: 'японский пруд', q: 'japanese pond koi garden zen' },
-    { label: 'рябь на воде', q: 'water ripples surface texture macro' },
-    { label: 'лодки в тумане', q: 'boats in morning fog harbor still' },
-    { label: 'причал', q: 'dock on still lake wooden minimal' },
-    { label: 'туманная гавань', q: 'misty harbor foggy morning boats' },
-    { label: 'озеро в дымке', q: 'lake mist sunrise still reflection silent' },
-    { label: 'синий час воды', q: 'blue hour water twilight ocean still' },
-    { label: 'спокойное море', q: 'calm sea morning horizon still empty' },
+    { label: 'hockney pools', q: 'david hockney pools' },
+    { label: 'онсэн', q: 'japanese onsen' },
+    { label: 'дождь в окно', q: 'rain on window' },
+    { label: 'инфинити-бассейн', q: 'infinity pool minimal' },
+    { label: 'фьорд', q: 'scandinavian fjord' },
+    { label: 'крытый бассейн', q: 'indoor swimming pool' },
+    { label: 'японский пруд', q: 'japanese pond' },
+    { label: 'рябь на воде', q: 'water ripples' },
+    { label: 'лодки в тумане', q: 'boats in morning fog' },
+    { label: 'причал', q: 'dock on still lake' },
+    { label: 'туманная гавань', q: 'misty harbor' },
+    { label: 'озеро в дымке', q: 'lake mist sunrise' },
+    { label: 'синий час воды', q: 'blue hour water' },
+    { label: 'спокойное море', q: 'calm sea morning' },
   ],
   'бумага и дерево': [
-    { label: 'стопка книг', q: 'stacked books aesthetic tower spines library' },
-    { label: 'книга на постели', q: 'open book on bed lazy morning sheets' },
-    { label: 'старая библиотека', q: 'vintage library interior wood ladder shelves' },
-    { label: 'рукопись', q: 'manuscript pages medieval illuminated' },
-    { label: 'переплёт вручную', q: 'hand bound books bookbinding workshop' },
-    { label: 'текстура бумаги', q: 'paper texture closeup handmade fiber macro' },
-    { label: 'высокая печать', q: 'letterpress print typography poster craft' },
-    { label: 'книжный магазин', q: 'bookshop interior daunt strand london' },
-    { label: 'старая карта', q: 'antique map paper cartography vellum' },
-    { label: 'васи', q: 'japanese washi paper kozo textured handmade' },
+    { label: 'стопка книг', q: 'stacked books aesthetic' },
+    { label: 'книга на постели', q: 'open book on bed' },
+    { label: 'старая библиотека', q: 'vintage library interior' },
+    { label: 'рукопись', q: 'manuscript pages' },
+    { label: 'переплёт вручную', q: 'hand bound books' },
+    { label: 'текстура бумаги', q: 'paper texture closeup' },
+    { label: 'высокая печать', q: 'letterpress print' },
+    { label: 'книжный магазин', q: 'bookshop interior' },
+    { label: 'старая карта', q: 'antique map paper' },
+    { label: 'васи', q: 'japanese washi paper' },
   ],
   'вечерний свет': [
-    { label: 'улица в час', q: 'golden hour street warm light buildings' },
-    { label: 'хоппер бар', q: 'hopper bar interior nighthawks edward hopper' },
-    { label: 'настольная лампа', q: 'evening lamp light warm reading corner' },
-    { label: 'окно в сумерках', q: 'dusk window silhouette twilight' },
-    { label: 'свечи на ужине', q: 'candle light dinner romantic table glow' },
-    { label: 'парижское кафе', q: 'evening cafe paris terrace twilight pavement' },
-    { label: 'архитектура сумерек', q: 'twilight architecture blue hour buildings' },
-    { label: 'окно ночью', q: 'lit window at night glowing room outside' },
-    { label: 'ресторан до гостей', q: 'restaurant before guests empty set tables glow' },
-    { label: 'синий час', q: 'blue hour city dusk skyline twilight' },
+    { label: 'улица в час', q: 'golden hour street' },
+    { label: 'хоппер бар', q: 'hopper bar interior' },
+    { label: 'настольная лампа', q: 'evening lamp light' },
+    { label: 'окно в сумерках', q: 'dusk window' },
+    { label: 'свечи на ужине', q: 'candle light dinner' },
+    { label: 'парижское кафе', q: 'evening cafe paris' },
+    { label: 'архитектура сумерек', q: 'twilight architecture' },
+    { label: 'окно ночью', q: 'lit window at night' },
+    { label: 'ресторан до гостей', q: 'restaurant before guests' },
+    { label: 'синий час', q: 'blue hour city' },
   ],
   'архитектурные паузы': [
-    { label: 'лестница музея', q: 'museum staircase grand marble empty' },
-    { label: 'дворик-арка', q: 'courtyard arch italian palazzo loggia' },
-    { label: 'свет через окно', q: 'light through window architecture shadow geometric' },
-    { label: 'коридор музея', q: 'infinite museum corridor enfilade gallery white' },
-    { label: 'пустая галерея', q: 'gallery interior empty white cube minimalist' },
-    { label: 'монастырский клуатр', q: 'monastery cloister columns arched silence' },
-    { label: 'итальянское палаццо', q: 'italian palazzo courtyard baroque renaissance loggia' },
-    { label: 'японский храм', q: 'japanese temple corridor wood tatami zen' },
-    { label: 'модернистская лестница', q: 'modernist staircase bauhaus spiral minimal' },
-    { label: 'gursky', q: 'andreas gursky inspired large format photography' },
+    { label: 'лестница музея', q: 'museum staircase' },
+    { label: 'дворик-арка', q: 'courtyard arch' },
+    { label: 'свет через окно', q: 'light through window architecture' },
+    { label: 'коридор музея', q: 'infinite museum corridor' },
+    { label: 'пустая галерея', q: 'gallery interior empty' },
+    { label: 'монастырский клуатр', q: 'monastery cloister' },
+    { label: 'итальянское палаццо', q: 'italian palazzo courtyard' },
+    { label: 'японский храм', q: 'japanese temple corridor' },
+    { label: 'модернистская лестница', q: 'modernist staircase' },
+    { label: 'gursky', q: 'andreas gursky inspired' },
   ],
   'русское тихое': [
-    { label: 'зелёная лампа', q: 'green table lamp soviet интеллигентский кабинет' },
-    { label: 'дача с верандой', q: 'russian dacha veranda wood country morning' },
-    { label: 'самовар', q: 'samovar tea russian still life table' },
-    { label: 'советские книги', q: 'soviet book covers academia ussr 60s 70s' },
-    { label: 'старая кухня', q: 'russian apartment kitchen old хрущёвка 90s' },
-    { label: 'двор ленинграда', q: 'leningrad courtyard st petersburg backyard' },
-    { label: 'тарковский', q: 'tarkovsky film stills stalker mirror solaris' },
-    { label: 'параджанов', q: 'parajanov film stills color of pomegranates' },
-    { label: 'советский графдизайн', q: 'soviet graphic design 60s poster constructivism' },
-    { label: 'красный угол', q: 'russian icon corner home orthodox' },
+    { label: 'зелёная лампа', q: 'green table lamp soviet' },
+    { label: 'дача с верандой', q: 'russian dacha veranda' },
+    { label: 'самовар', q: 'samovar tea' },
+    { label: 'советские книги', q: 'soviet book covers academia' },
+    { label: 'старая кухня', q: 'russian apartment kitchen old' },
+    { label: 'двор ленинграда', q: 'leningrad courtyard' },
+    { label: 'тарковский', q: 'tarkovsky film stills' },
+    { label: 'параджанов', q: 'parajanov film stills' },
+    { label: 'советский графдизайн', q: 'soviet graphic design 60s' },
+    { label: 'красный угол', q: 'russian icon corner home' },
   ],
   'долгий разговор': [
     // Категория про атмосферу разговоров — в «стол накрыт» осталась еда как объект
-    { label: 'две чашки', q: 'two cups on table coffee tea morning' },
-    { label: 'книга на коленях', q: 'open book on lap reading hands soft' },
-    { label: 'кухня вечером', q: 'kitchen late evening light warm lamp' },
-    { label: 'окна в ночи', q: 'lit windows at night from outside warm glow' },
-    { label: 'кафе ночью', q: 'paris cafe at night table cloth wine candle' },
-    { label: 'на кухне', q: 'russian kitchen conversation хрущёвка friends tea' },
-    { label: 'свечи', q: 'candles on table dinner intimate flicker' },
-    { label: 'у камина', q: 'fireplace evening warm reading wine' },
-    { label: 'разговор за столом', q: 'people talking dinner candid supper guests' },
-    { label: 'опустевшая комната', q: 'empty quiet living room evening lamp couch silence' },
+    { label: 'две чашки', q: 'two cups on table' },
+    { label: 'книга на коленях', q: 'open book on lap' },
+    { label: 'кухня вечером', q: 'kitchen late evening light' },
+    { label: 'окна в ночи', q: 'lit windows at night' },
+    { label: 'кафе ночью', q: 'paris cafe at night' },
+    { label: 'на кухне', q: 'russian kitchen conversation' },
+    { label: 'свечи', q: 'candles on table' },
+    { label: 'у камина', q: 'fireplace evening' },
+    { label: 'разговор за столом', q: 'people talking dinner candid' },
+    { label: 'опустевшая комната', q: 'empty quiet living room evening' },
   ],
 };
 
@@ -5309,7 +5272,7 @@ function onPresetChange() {
     } else if (typeof search === 'function') {
       // Не дёргаем поиск при пустом query — иначе после смены раздела
       // без введённого запроса полетят «missing q» на 5+ источников.
-      if (state.query) search(state.query, false, { trigger: 'preset-change' });
+      if (state.query) search(state.query);
       else if (typeof renderCard === 'function') renderCard();
     }
   }, 200);
@@ -5962,11 +5925,7 @@ function parseRedditResponse(data) {
 }
 
 async function fetchUnsplash(query, key) {
-  // В artist+beginner unsplash доминирует impressions (43% от всех), но
-  // имеет высокий skip-rate. Снижаем per_page до 15 — освобождает слоты
-  // для pixabay/pexels/reddit с лучшим dwell-time.
-  const perPage = (state.mode === 'artist' && state.artistLevel === 'beginner') ? 15 : 30;
-  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&client_id=${encodeURIComponent(key)}`;
+  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=30&client_id=${encodeURIComponent(key)}`;
   const r = await fetchWithTimeout(url);
   if (!r.ok) throw new Error(`Unsplash ${r.status}`);
   const data = await r.json();
@@ -6971,17 +6930,14 @@ const SOURCE_CLASS = {
   openverse:   { strength: ['concept', 'descriptive'] },
   // Reddit: универсал, любой тип кроме чистых artist (имена не работают в EN-сабах).
   reddit:      { strength: ['concept', 'descriptive', 'technical', 'mood', 'style'] },
-  // Museums / archives: artist + style + historical + concept/descriptive.
-  // Раньше музеи отваливались на «sunlit kitchen warm interior» (intent=
-  // descriptive) — а у них реально есть interior/light/kitchen фото в
-  // коллекциях. Расширил strength, чтобы aesthetic-режим их использовал.
-  artic:       { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
-  smithsonian: { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
-  met:         { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
-  wikiart:     { strength: ['artist', 'style', 'historical', 'concept', 'descriptive'] },
-  iarchive:    { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
-  nypl:        { strength: ['artist', 'historical', 'concept', 'descriptive'] },
-  artvee:      { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
+  // Museums / archives: artist + style + historical. На technical → шум.
+  artic:       { strength: ['artist', 'historical', 'style'] },
+  smithsonian: { strength: ['artist', 'historical', 'style'] },
+  met:         { strength: ['artist', 'historical', 'style'] },
+  wikiart:     { strength: ['artist', 'style', 'historical'] },
+  iarchive:    { strength: ['artist', 'historical', 'style', 'concept'] },
+  nypl:        { strength: ['artist', 'historical', 'concept'] },
+  artvee:      { strength: ['artist', 'historical', 'style'] },
   // Booru / DA / Tumblr / ArtStation — single-tag, лучше для concept/mood.
   safebooru:   { strength: ['concept', 'mood'] },
   deviantart:  { strength: ['concept', 'style', 'mood'] },
@@ -7133,9 +7089,8 @@ const EN_ONLY_SOURCES = new Set([
 // Unsplash/Pexels/Pixabay — обычно <2s, 6s.
 // Met двухступенчатый (search + 24 параллельных fetch'а), 12s.
 const SOURCE_TIMEOUTS_MS = {
-  // 2026-05-11: подняли reddit с 7500 — на занятых периодах он лучше
-  // отвечает за 10s, чем падает на 7.5.
-  reddit: 10000,
+  // 2026-05-10: 5000 was too tight — реальный отчёт показал timeout на cold-cache.
+  reddit: 7500,
   unsplash: 6000, pexels: 6000, pixabay: 6000, flickr: 7000,
   artic: 7000, smithsonian: 7000, safebooru: 5000, openverse: 6000,
   wallhaven: 7000,
@@ -7145,15 +7100,9 @@ const SOURCE_TIMEOUTS_MS = {
   tumblr: 7000, deviantart: 8000, artstation: 7000,
   dribbble: 9000, 'dribbble-tags': 9000,
   wikiart: 7000, iarchive: 8000, nypl: 7000, opensea: 7000,
-  // 2026-05-11: feed-сорсы (designer-only) подняли с 7000 — они всегда
-  // отдают через 8-11s, при 7s падают в 95% случаев.
-  'awwwards-rss': 12000, siteinspire: 12000, fwa: 12000,
-  artvee: 9000, 'land-book': 12000,
-  pinterest: 18000,
-  // 2026-05-11: cosmos подняли 9000→20000 — headless ходит долго, но при
-  // успехе отдаёт ~24 картинки. Лучше подождать 4с лишних чем потерять.
-  cosmos: 20000,
-  readcv: 18000,
+  'awwwards-rss': 7000, siteinspire: 7000, fwa: 7000,
+  artvee: 9000, 'land-book': 18000,
+  pinterest: 18000, cosmos: 9000, readcv: 18000,
   'figma-community': 18000, mobbin: 18000, refero: 18000,
   met: 12000,
 };
@@ -7716,7 +7665,7 @@ function renderCard() {
         const newQ = el.dataset.q;
         const inp = document.getElementById('query');
         if (inp) inp.value = newQ;
-        search(newQ, false, { trigger: 'empty-suggestion' });
+        search(newQ);
       });
     });
     stack.querySelectorAll('.empty-tip[data-action="search"]').forEach(el => {
@@ -7724,13 +7673,10 @@ function renderCard() {
         const newQ = el.dataset.q;
         const inp = document.getElementById('query');
         if (inp) inp.value = newQ;
-        search(newQ, false, { trigger: 'empty-tip' });
+        search(newQ);
       });
     });
     state.current = null;
-    // Очистим мини-подпись под «скрыть» (нет карты — нечего показывать).
-    const metaEl = document.getElementById('action-meta');
-    if (metaEl) metaEl.innerHTML = '';
     return;
   }
 
@@ -7850,19 +7796,6 @@ function renderCard() {
       if (mode === 'author') openAuthorStack(it);
       else if (mode === 'similar') openSimilarSearch(it);
     };
-  }
-
-  // Мини-подпись под кнопкой «скрыть» (side-layout). В below-layout
-  // элемент скрыт через CSS — автор там и так виден в caption.
-  const meta = document.getElementById('action-meta');
-  if (meta) {
-    const author = state.current.author || '';
-    const srcHref = state.current.pageUrl || '#';
-    const srcText = state.current.source || '';
-    meta.innerHTML = author || srcText
-      ? `${author ? `<span class="meta-author">${escapeHtml(author)}</span>` : ''}` +
-        `${srcText ? `<a href="${escapeHtml(srcHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(srcText)}</a>` : ''}`
-      : '';
   }
 
   renderCardTimer();
@@ -8194,64 +8127,7 @@ function updateLikedBadge() {
 }
 
 // ============== SEARCH ==============
-// Снимок «что мы шлём» — для history-события 'search'. Собирает trigger,
-// активные хинты, список таргет-источников, режимные оси. Используется
-// для подробных action-логов в подвкладке истории.
-function buildSearchContext(query, opts = {}) {
-  const ctx = {
-    query,
-    trigger: opts.trigger || 'manual',
-    tag: opts.tag || null,
-    category: (typeof activeCategory !== 'undefined' ? activeCategory : null),
-    mode: state.mode,
-    view: state.view,
-  };
-  // Режимные оси.
-  if (state.mode === 'artist')     ctx.artistLevel = state.artistLevel || 'all';
-  if (state.mode === 'designer')   { ctx.platform = state.designerPlatform || 'all'; ctx.domain = state.designerDomain || 'all'; }
-  if (state.mode === 'aesthetic')  ctx.theme = state.aestheticTheme || 'all';
-  // Активные хинты (те что эффективно навешиваются в effectiveQueryFor).
-  const hints = {};
-  if (state.mode === 'artist' && ARTIST_LEVEL_HINTS[state.artistLevel]) {
-    hints.level = ARTIST_LEVEL_HINTS[state.artistLevel];
-  }
-  if (state.mode === 'designer') {
-    const ch = DESIGNER_CATEGORY_HINTS[activeCategory];
-    if (ch) hints.category = ch;
-    if (ctx.platform && ctx.platform !== 'all') hints.platform = ctx.platform;
-    if (ctx.domain   && ctx.domain   !== 'all') hints.domain   = ctx.domain;
-  }
-  if (state.mode === 'aesthetic') {
-    const ch = AESTHETIC_CATEGORY_HINTS[activeCategory];
-    if (ch) hints.category = ch;
-  }
-  if (Object.keys(hints).length) ctx.hints = hints;
-  // Целевые источники (после всех фильтров — pres-binding, blocklist,
-  // enabledSourcesByMode). Это и есть финальный список fetchers'ов.
-  try {
-    const ids = (typeof getActiveSourceIds === 'function') ? getActiveSourceIds() : [];
-    if (ids && ids.length) ctx.sources = ids;
-  } catch (e) {}
-  // Pre-snapshot активного пресета — пригодится для отчётов.
-  try {
-    const pid = state.activeCustomPreset?.[state.mode];
-    if (pid) {
-      const p = state.customPresets?.find(x => x.id === pid);
-      ctx.preset = p ? p.label : pid;
-    }
-  } catch (e) {}
-  return ctx;
-}
-
-async function search(query, append = false, opts = {}) {
-  // Дедуп: если onPresetChange запланировал отложенный поиск (200ms
-  // debounce после смены раздела/уровня/фильтра), а в этот момент юзер
-  // кликнул тег и явно дёрнул search() — гасим pending-таймер чтобы
-  // он не сработал дублем с тем же query.
-  if (!append && typeof _onPresetChangeTimer !== 'undefined' && _onPresetChangeTimer) {
-    clearTimeout(_onPresetChangeTimer);
-    _onPresetChangeTimer = null;
-  }
+async function search(query, append = false) {
   // Пустой запрос — НЕ дёргаем бэкенд (5 источников вернут «missing q»),
   // НЕ пишем в history. Просто очищаем стек и показываем idle empty-state.
   // Это срабатывает после mode-switch + клика по категории (см. п.4).
@@ -8265,8 +8141,6 @@ async function search(query, append = false, opts = {}) {
     return;
   }
   state.query = query;
-  // Сразу засекаем когда начался поиск — durationMs пойдёт в search_result.
-  const _searchStartedAt = Date.now();
   if (!append) {
     state.loading = true;
     state.queue = [];
@@ -8276,9 +8150,7 @@ async function search(query, append = false, opts = {}) {
     // текущим query — кликнул чип, ввёл руками или сменил тег, всё
     // одинаково обновляется.
     if (typeof renderPresets === 'function') renderPresets();
-    // Подробное событие действия: trigger, тег, раздел, режим, хинты,
-    // целевые источники. См. buildSearchContext.
-    historyLog('search', buildSearchContext(query, opts));
+    historyLog('search', { query });
     // Quality metrics: общий счётчик + отдельный для cyrillic-запросов
     // (cyrillic-empty rate — ключевая метрика multilingual-проблемы).
     state.metrics.searches++;
@@ -8318,48 +8190,32 @@ async function search(query, append = false, opts = {}) {
     });
     let { items, errors, skippedDueToCyrillic, skippedDueToHealth } = result;
 
-    // Smart Fallback v1: на initial-search с <K результатами — пробуем
-    // relax (drop последние 1-2 слова). До 2 попыток подряд:
-    //   попытка 1: убираем 1 слово (если ≥2 слов)
-    //   попытка 2: если всё ещё <K, убираем ещё одно (если ≥3 слов в q)
-    // Защита от зацикливания: state._fallbackUsed считает попытки.
+    // Smart Fallback v0: на initial-search с <K результатами и cyrillic/multi-word
+    // запросом — пробуем relax (drop последнее слово) и берём ещё одну порцию.
+    // Защита от зацикливания через state._fallbackUsed (сбрасывается на новом search).
     const FALLBACK_MIN = 10;
-    state._fallbackUsed = 0;   // numeric counter, было boolean
-    const tryFallback = async (dropN) => {
+    if (!append && !state._fallbackUsed && items.length < FALLBACK_MIN) {
       const words = String(query || '').trim().split(/\s+/).filter(Boolean);
-      if (words.length < dropN + 1) return null;
-      const relaxed = words.slice(0, -dropN).join(' ');
-      try {
-        const more = await fetchAll(relaxed, () => {});
-        const seenIds = new Set(items.map(i => i.id));
-        const seenCanons = new Set(items.map(i => i._canonUrl).filter(Boolean));
-        let added = 0;
-        for (const it of (more.items || [])) {
-          if (seenIds.has(it.id)) continue;
-          if (it._canonUrl && seenCanons.has(it._canonUrl)) continue;
-          items.push(it);
-          seenIds.add(it.id);
-          if (it._canonUrl) seenCanons.add(it._canonUrl);
-          added++;
-        }
-        return { dropped: words.slice(-dropN).join(' '), relaxed, added };
-      } catch (e) { return null; }
-    };
-    if (!append && items.length < FALLBACK_MIN) {
-      state._fallbackUsed = 1;
-      state.metrics.fallbackTriggered++;
-      const info1 = await tryFallback(1);
-      if (info1) state._fallbackInfo = info1;
-      // Вторая попытка — если первая не дотянула.
-      if (items.length < FALLBACK_MIN) {
-        const info2 = await tryFallback(2);
-        if (info2) {
-          state._fallbackUsed = 2;
-          // Если второй пас был успешнее — обновляем info для toast'а.
-          if (!info1 || (info2.added || 0) > (info1.added || 0)) {
-            state._fallbackInfo = info2;
+      // Релаксируем только если есть что выбросить — оставляем ≥1 слово.
+      if (words.length >= 2) {
+        state._fallbackUsed = true;
+        state.metrics.fallbackTriggered++;
+        const relaxed = words.slice(0, -1).join(' ');
+        try {
+          const more = await fetchAll(relaxed, () => {});
+          // Объединяем без дублей по canonical url + id.
+          const seenIds = new Set(items.map(i => i.id));
+          const seenCanons = new Set(items.map(i => i._canonUrl).filter(Boolean));
+          for (const it of (more.items || [])) {
+            if (seenIds.has(it.id)) continue;
+            if (it._canonUrl && seenCanons.has(it._canonUrl)) continue;
+            items.push(it);
+            seenIds.add(it.id);
+            if (it._canonUrl) seenCanons.add(it._canonUrl);
           }
-        }
+          // Сохраняем info для empty-state UX и для toast-уведомления.
+          state._fallbackInfo = { dropped: words[words.length - 1], relaxed };
+        } catch (e) { /* fallback дал ошибку — просто игнорим */ }
       }
     }
 
@@ -8380,32 +8236,6 @@ async function search(query, append = false, opts = {}) {
     }
     state.loading = false;
     renderCard();
-    // Подробный отчёт о результате: per-source counts/errors, skipped,
-    // duration. Только для non-append (рефилл — служебный).
-    if (!append) {
-      try {
-        const perSource = {};
-        for (const it of (items || [])) {
-          const s = it && it.source;
-          if (!s) continue;
-          (perSource[s] = perSource[s] || { count: 0 }).count++;
-        }
-        for (const e of (errors || [])) {
-          const s = e && e.source;
-          if (!s) continue;
-          (perSource[s] = perSource[s] || { count: 0 }).error = e.message || String(e);
-        }
-        historyLog('search_result', {
-          query,
-          total: items?.length || 0,
-          sources: perSource,
-          skippedCyrillic: (skippedDueToCyrillic || []).map(s => s.id || s),
-          skippedHealth:   (skippedDueToHealth   || []).map(s => s.id || s),
-          fallbackUsed: !!state._fallbackUsed,
-          durationMs: Date.now() - _searchStartedAt,
-        });
-      } catch (e) { /* logging shouldn't kill UX */ }
-    }
     // Toast: если фолбэк сработал и реально дал прирост — показать subtle hint
     // под полем ввода, что мы расширили запрос.
     if (!append && state._fallbackUsed && state._fallbackInfo && items.length > 0) {
@@ -9407,9 +9237,9 @@ function bind(id, handler, event = 'onclick') {
   if (el) el[event] = handler;
 }
 
-const doSearch = (opts = {}) => {
+const doSearch = () => {
   const q = document.getElementById('query').value.trim();
-  if (q) search(q, false, { trigger: 'manual', ...opts });
+  if (q) search(q);
 };
 bind('search-btn', doSearch);
 bind('query', (e) => {
@@ -9474,9 +9304,6 @@ function renderCategories() {
     el.textContent = name;
     el.onclick = () => {
       activeCategory = name;
-      // Записываем сам факт клика по разделу — даже если он не порождает
-      // поиск (пустой query), это всё равно действие пользователя.
-      historyLog('category_change', { category: name, mode: state.mode });
       renderCategories();
       renderPresets();
       // Категория — также ось пресета (низший приоритет в getActivePresetId).
@@ -9550,7 +9377,6 @@ function renderPresets() {
       if (isActive) {
         // Повторный клик по активному тегу — снимаем (toggle off).
         // Очищаем поле и стек, никакого нового поиска не дёргаем.
-        historyLog('tag_untoggle', { tag: item.label, q: item.q, category: activeCategory });
         if (inp) inp.value = '';
         state.query = '';
         state.queue = [];
@@ -9559,8 +9385,7 @@ function renderPresets() {
         renderExpansion();
       } else {
         if (inp) inp.value = item.q;
-        // Передаём контекст: trigger=tag-click, label тега.
-        search(item.q, false, { trigger: 'tag-click', tag: item.label });
+        search(item.q);
         // Подсветим этот тег сразу — пока search не дёрнул re-render.
         renderPresets();
       }
@@ -9599,7 +9424,7 @@ function renderExpansion() {
         : `${q} ${m}`.trim();
       const inp = document.getElementById('query');
       if (inp) inp.value = newQ;
-      search(newQ, false, { trigger: 'expansion-chip', expansionMod: m });
+      search(newQ);
     };
     row.appendChild(el);
   });
@@ -11311,27 +11136,17 @@ document.querySelectorAll('.modal-backdrop').forEach(m => {
 // слушаем 'controllerchange' и тихо перезагружаем страницу один раз,
 // чтобы юзер сразу увидел свежую версию без дополнительных кликов.
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
-  // Очистка legacy-флага из предыдущей реализации controllerchange-листенера
-  // (он блокировал авто-reload после первого обновления в сессии).
-  try { sessionStorage.removeItem('soma.swReloaded'); } catch (e) {}
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
       try { reg.update(); } catch (e) {}
-      // Дополнительный update-чек: когда юзер возвращается на вкладку
-      // после долгого отсутствия — спрашиваем у браузера свежий sw.js.
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-          try { reg.update(); } catch (e) {}
-        }
-      });
     }).catch(() => {});
-    // Авто-релоад при смене активного SW. Защита от петли только
-    // в рамках текущей загрузки (in-closure boolean) — после reload
-    // страница стартует заново с чистым `reloading=false`, так что
-    // СЛЕДУЮЩИЕ обновления SW тоже сработают.
+    // Авто-релоад при смене активного SW. Защита от петли через
+    // sessionStorage флаг — релоадим один раз за сессию.
     let reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (reloading) return;
+      if (sessionStorage.getItem('soma.swReloaded') === '1') return;
+      sessionStorage.setItem('soma.swReloaded', '1');
       reloading = true;
       location.reload();
     });
@@ -11584,13 +11399,14 @@ function loadBackendInfo() {
   return fetch(`${BACKEND_URL}/api/info`).then(r => r.json()).then(info => {
     diagBackendInfo = info;
     // Capability: bell-режим доступен только держателям BELL_KEY.
+    const wasAvailable = state.bellAvailable;
     state.bellAvailable = !!(info && info.capabilities && info.capabilities.bell);
-    // Всегда (а не только при изменении) обновляем mode-toggle и
-    // settings-секцию. Иначе при логине новым ключом без bell-capability
-    // visibility флаги в DOM могли остаться от прошлой сессии (SW кешит
-    // или иной race). renderModeToggle идемпотентен и дешёв.
-    if (typeof renderModeToggle === 'function') renderModeToggle();
-    if (typeof renderBellToggle === 'function') renderBellToggle();
+    // Если capability только что появилась — даём фронту обновить
+    // mode-toggle и settings (например, юзер только что ввёл новый ключ).
+    if (state.bellAvailable !== wasAvailable) {
+      if (typeof renderModeToggle === 'function') renderModeToggle();
+      if (typeof renderBellToggle === 'function') renderBellToggle();
+    }
     if (document.getElementById('diag-modal').classList.contains('show')) renderDiag();
   }).catch(() => {});
 }
@@ -12070,7 +11886,6 @@ function closeDiag() { document.getElementById('diag-modal').classList.remove('s
 // ============== HISTORY ==============
 const HIST_TYPE_LABEL = {
   search: 'поиск',
-  search_result: 'результат',
   save: 'сохранение',
   skip: 'пропуск',
   transition: 'переход',
@@ -12078,23 +11893,10 @@ const HIST_TYPE_LABEL = {
   error: 'ошибка',
   session_start: 'старт сессии',
   hide: 'скрытие',
-  category_change: 'раздел',
-  tag_untoggle: 'тег ↓',
-};
-const TRIGGER_LABEL = {
-  'manual':            'руками',
-  'tag-click':         'клик по тегу',
-  'preset-change':     'смена раздела',
-  'mode-switch':       'смена режима',
-  'empty-suggestion':  'клик в empty-state',
-  'empty-tip':         'клик «попробуй короче»',
-  'expansion-chip':    '«ещё угол»',
-  'init':              'старт приложения',
 };
 const HIST_FILTERS = [
   { id: 'all', label: 'все', match: () => true },
   { id: 'search', label: 'поиски', match: ev => ev.type === 'search' },
-  { id: 'results', label: 'результаты', match: ev => ev.type === 'search_result' },
   { id: 'save', label: 'сохранения', match: ev => ev.type === 'save' },
   // Скрытия: новый событие 'hide' (с reason + контекстом) + старые
   // 'block'/'hide-category' для обратной совместимости с уже записанной
@@ -12127,51 +11929,7 @@ function fmtHistDuration(ms) {
 function histDetail(ev) {
   const p = ev.payload || {};
   switch (ev.type) {
-    case 'search': {
-      // Подробное действие: query, trigger, тег, раздел, режим, хинты,
-      // целевые источники.
-      const parts = [];
-      parts.push(`«${p.query || '(пусто)'}»`);
-      if (p.trigger) parts.push(TRIGGER_LABEL[p.trigger] || p.trigger);
-      if (p.tag) parts.push(`тег: ${p.tag}`);
-      if (p.category) parts.push(`раздел: ${p.category}`);
-      if (p.mode) parts.push(`режим: ${p.mode === 'artist' ? 'художник' : (p.mode === 'designer' ? 'дизайнер' : (p.mode === 'aesthetic' ? 'эстетика' : p.mode))}`);
-      if (p.artistLevel && p.artistLevel !== 'all') parts.push(`уровень: ${p.artistLevel}`);
-      if (p.platform && p.platform !== 'all') parts.push(`платформа: ${p.platform}`);
-      if (p.domain   && p.domain   !== 'all') parts.push(`тип: ${p.domain}`);
-      if (p.theme    && p.theme    !== 'all') parts.push(`тема: ${p.theme}`);
-      if (p.preset) parts.push(`пресет: ${p.preset}`);
-      if (p.hints && Object.keys(p.hints).length) {
-        const hintsStr = Object.entries(p.hints).map(([k, v]) => `${k}=${v}`).join(', ');
-        parts.push(`хинты: ${hintsStr}`);
-      }
-      if (Array.isArray(p.sources)) parts.push(`целей: ${p.sources.length}`);
-      return parts.join(' · ');
-    }
-    case 'search_result': {
-      // Подробный отчёт: сколько чего по каждому источнику + skipped + duration.
-      const total = p.total || 0;
-      const sources = p.sources || {};
-      const okEntries = Object.entries(sources).filter(([, v]) => v.count > 0);
-      const errEntries = Object.entries(sources).filter(([, v]) => v.error);
-      const okStr = okEntries
-        .sort((a, b) => (b[1].count || 0) - (a[1].count || 0))
-        .map(([s, v]) => `${s}:${v.count}`)
-        .join(', ');
-      const errStr = errEntries
-        .map(([s, v]) => `${s}:${v.error}`)
-        .join(', ');
-      const parts = [`всего: ${total}`];
-      if (okStr) parts.push(`✓ ${okStr}`);
-      if (errStr) parts.push(`✗ ${errStr}`);
-      if (p.skippedCyrillic?.length) parts.push(`пропущено (cyr): ${p.skippedCyrillic.join(', ')}`);
-      if (p.skippedHealth?.length)   parts.push(`пропущено (health): ${p.skippedHealth.join(', ')}`);
-      if (p.fallbackUsed) parts.push('fallback ↺');
-      if (p.durationMs)  parts.push(`${p.durationMs}мс`);
-      return parts.join(' · ');
-    }
-    case 'category_change': return `раздел: ${p.category || '?'} · режим: ${p.mode === 'artist' ? 'художник' : (p.mode === 'designer' ? 'дизайнер' : 'эстетика')}`;
-    case 'tag_untoggle':    return `снят тег «${p.tag || '?'}» из раздела «${p.category || '?'}»`;
+    case 'search': return p.query || '';
     case 'save':   return `из ${p.source || '—'}${p.author ? ' · ' + p.author : ''}`;
     case 'skip':   return `из ${p.source || '—'}`;
     case 'transition': return `${p.kind || ''}: ${p.from || ''} → ${p.to || ''}`;
@@ -12283,211 +12041,16 @@ function clearHistory() {
   renderHistory();
 }
 
-// ============== HISTORY EXPORT ==============
-// Расширенный экспорт: помимо самих событий — снимок текущего состояния,
-// метрики, агрегаты, blocklist'ы (только размеры/айди для приватности),
-// per-source diag, контекст окружения. Цель — чтобы по одному JSON можно
-// было полностью разобрать сессию без обращения к серверу.
 function exportHistoryJson() {
-  const events = state.history.events || [];
-
-  // --- byType (event-type counts) ---
-  const byType = events.reduce((m, e) => (m[e.type] = (m[e.type] || 0) + 1, m), {});
-
-  // --- topN по полю в payload ---
-  const topN = (predicate, key, n = 10) => {
-    const counts = {};
-    for (const e of events) {
-      if (!predicate(e)) continue;
-      const k = key(e);
-      if (!k) continue;
-      counts[k] = (counts[k] || 0) + 1;
-    }
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, c]) => ({ key: k, count: c }));
-  };
-
-  // --- topSources (за разные действия) ---
-  const sourcesPerAction = {
-    impressions: topN(e => e.type === 'search_result' && e.payload?.sources, e => null, 10),
-    saved:       topN(e => e.type === 'save',  e => e.payload?.source, 10),
-    skipped:     topN(e => e.type === 'skip',  e => e.payload?.source, 10),
-    hidden:      topN(e => e.type === 'hide',  e => e.payload?.source, 10),
-    opened:      topN(e => e.type === 'open',  e => e.payload?.source, 10),
-    errored:     topN(e => e.type === 'error', e => e.payload?.source, 20),
-  };
-  // sourceImpressions считаем из перебора всех search_result.sources
-  const impressions = {};
-  for (const e of events) {
-    if (e.type !== 'search_result') continue;
-    const srcs = e.payload?.sources || {};
-    for (const [s, info] of Object.entries(srcs)) {
-      if (typeof info?.count === 'number') impressions[s] = (impressions[s] || 0) + info.count;
-    }
-  }
-  sourcesPerAction.impressions = Object.entries(impressions).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, c]) => ({ key: k, count: c }));
-
-  // --- topTags / topCategories / triggers / hideReasons ---
-  const topTags       = topN(e => e.type === 'search', e => e.payload?.tag,      15);
-  const topCategories = topN(e => e.type === 'search', e => e.payload?.category, 15);
-  const triggers      = topN(e => e.type === 'search', e => e.payload?.trigger,  10);
-  const hideReasons   = topN(e => e.type === 'hide',   e => e.payload?.reason,   10);
-
-  // --- error messages topN ---
-  const errorsByMessage = topN(e => e.type === 'error', e => `${e.payload?.source || '?'}: ${e.payload?.message || ''}`.slice(0, 80), 15);
-
-  // --- avg search duration ---
-  const durations = events.filter(e => e.type === 'search_result' && typeof e.payload?.durationMs === 'number').map(e => e.payload.durationMs);
-  const avgDuration = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : null;
-  const maxDuration = durations.length ? Math.max(...durations) : null;
-  const minDuration = durations.length ? Math.min(...durations) : null;
-
-  // --- recent (последние 10 по типам) ---
-  const lastN = (predicate, n) => events.filter(predicate).slice(-n).map(e => ({
-    ts: new Date(e.ts).toISOString(), type: e.type, payload: e.payload,
-  }));
-
-  // --- empty searches ---
-  const emptyResults = events.filter(e => e.type === 'search_result' && (e.payload?.total || 0) === 0).length;
-
-  // --- snapshot текущего состояния ---
-  const currentState = {
-    mode: state.mode,
-    view: state.view,
-    query: state.query || '',
-    activeCategory: (typeof activeCategory !== 'undefined' ? activeCategory : null),
-    axes: {
-      artistLevel: state.artistLevel || 'all',
-      designerPlatform: state.designerPlatform || 'all',
-      designerDomain: state.designerDomain || 'all',
-      aestheticTheme: state.aestheticTheme || 'all',
-    },
-    bell: { available: !!state.bellAvailable, enabled: !!state.bellEnabled },
-    activeCustomPreset: state.activeCustomPreset || null,
-    subreddits: state.subreddits || [],
-    enabledSourcesByMode: state.enabledSourcesByMode || {},
-    likedCount: (state.liked || []).length,
-    queueSize: (state.queue || []).length,
-  };
-
-  // --- blocklist'ы (без содержимого для приватности — только размеры/айди) ---
-  const globalBL = state.blocklist || { images: [], authors: [], sources: [] };
-  const catBL = state.categoryBlocklist || {};
-  const catBLSummary = {};
-  for (const [cat, b] of Object.entries(catBL)) {
-    catBLSummary[cat] = {
-      images: (b.images || []).length,
-      authors: (b.authors || []).length,
-      sources: (b.sources || []),   // sources ids — публичные, безопасно
-    };
-  }
-
-  // --- per-source diag snapshot ---
-  // NB: используем `??` вместо `||` чтобы числовой 0 не превращался в null
-  // (раньше `info.items || null` врал что items=null, хотя на самом деле 0).
-  const diag = {};
-  for (const [sid, info] of Object.entries(state.diag || {})) {
-    diag[sid] = {
-      status: info.status || 'unknown',
-      lastTested: info.lastTested ? new Date(info.lastTested).toISOString() : null,
-      ms: info.ms ?? null,
-      items: info.items ?? null,
-      statusCode: info.statusCode ?? null,
-      error: info.error ?? null,
-    };
-  }
-
-  // --- env context ---
-  const ctx = {
-    appVersion: (typeof APP_VERSION === 'string' ? APP_VERSION : '?'),
-    clientId: CLIENT_ID || null,
-    backendUrl: BACKEND_URL || '(same-origin)',
-    userAgent: navigator.userAgent,
-    viewport: { width: window.innerWidth, height: window.innerHeight, dpr: window.devicePixelRatio || 1 },
-    locale: navigator.language || '?',
-    layout: document.body.getAttribute('data-layout') || 'below',
-    ambient: document.body.getAttribute('data-ambient') || 'off',
-    modeui:  document.body.getAttribute('data-modeui') || 'full',
-    catsui:  document.body.getAttribute('data-catsui') || 'all',
-  };
-  // Backend info (если /api/info уже отвечал)
-  const backendInfo = (typeof diagBackendInfo !== 'undefined' && diagBackendInfo) ? {
-    name: diagBackendInfo.backend?.name || null,
-    version: diagBackendInfo.backend?.version || null,
-    node: diagBackendInfo.backend?.node || null,
-    uptimeSec: diagBackendInfo.backend?.uptimeSec || null,
-    envFlags: diagBackendInfo.env || {},
-    capabilities: diagBackendInfo.capabilities || {},
-  } : null;
-
-  // --- sources catalogue (id+name+modes+needsKey) — для быстрой расшифровки ---
-  const sourcesCatalogue = (Array.isArray(SOURCES) ? SOURCES : []).map(s => ({
-    id: s.id, name: s.name, modes: s.modes || null,
-    needsKey: !!s.needsKey, viaBackend: !!s.viaBackend,
-    keyConfigured: !!(s.id && state.keys?.[s.id]),
-  }));
-
-  // --- outbox state (если есть незаплевавшие push) ---
-  let outboxSize = 0;
-  try { outboxSize = (_outboxLoad() || []).length; } catch (e) {}
-
+  const events = state.history.events;
+  const counts = events.reduce((m, e) => (m[e.type] = (m[e.type] || 0) + 1, m), {});
   const payload = {
     exportedAt: new Date().toISOString(),
     sessionStartedAt: new Date(state.history.startedAt).toISOString(),
-    sessionDurationMs: Date.now() - state.history.startedAt,
-    schemaVersion: 2,
-
-    context: ctx,
-    backendInfo,
-    currentState,
-
-    metrics: {
-      ...state.metrics,
-      eventCount: events.length,
-      outboxPending: outboxSize,
-    },
-
-    aggregates: {
-      byType,
-      topTags,
-      topCategories,
-      triggers,
-      hideReasons,
-      sourcesPerAction,
-      errorsByMessage,
-      searchDurationMs: { avg: avgDuration, min: minDuration, max: maxDuration, samples: durations.length },
-      emptyResults,
-    },
-
-    recent: {
-      searches:   lastN(e => e.type === 'search',        10),
-      results:    lastN(e => e.type === 'search_result', 10),
-      hides:      lastN(e => e.type === 'hide',          20),
-      saves:      lastN(e => e.type === 'save',          20),
-      errors:     lastN(e => e.type === 'error',         20),
-      transitions:lastN(e => e.type === 'transition',    20),
-    },
-
-    blocklists: {
-      global: {
-        images:  (globalBL.images || []).length,
-        authors: (globalBL.authors || []).length,
-        sources: globalBL.sources || [],   // id'шники — не sensitive
-      },
-      byCategory: catBLSummary,
-    },
-
-    sourcesCatalogue,
-    diag,
-
-    // Полный поток событий — last (для совместимости со старым экспортом).
-    events: events.map(e => ({
-      ts: new Date(e.ts).toISOString(),
-      id: e.id || null,
-      type: e.type,
-      payload: e.payload,
-    })),
+    durationMs: Date.now() - state.history.startedAt,
+    aggregates: counts,
+    events: events.map(e => ({ ts: new Date(e.ts).toISOString(), type: e.type, payload: e.payload })),
   };
-
   downloadJson(payload, `soma-history-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`);
 }
 
@@ -13198,7 +12761,7 @@ function applyMode(mode, opts = {}) {
     historyLog('transition', { kind: 'mode', from: previous, to: mode });
     // Запускаем поиск только если запрос непустой. Иначе показываем
     // idle-стейт (renderCard выше — empty-state с предложениями тегов).
-    if (state.query) search(state.query, false, { trigger: 'mode-switch' });
+    if (state.query) search(state.query);
   }
   // Always update the today block visibility & content when applyMode runs
   if (mode === 'aesthetic' && state.view === 'stack') {
@@ -13251,12 +12814,6 @@ function setupBellToggle() {
   try {
     state.bellEnabled = localStorage.getItem('rs:bellEnabled') === '1';
   } catch (e) {}
-  // Проактивно ставим actual hidden-флаг на bell-opt по текущему стейту,
-  // даже до того как loadBackendInfo вернётся. На этом этапе
-  // bellAvailable=false по умолчанию — значит bell скроется. Если потом
-  // /api/info подтвердит capability, renderModeToggle вызовется снова
-  // (см. loadBackendInfo).
-  renderModeToggle();
 }
 
 function setupModeToggle() {
@@ -13291,162 +12848,26 @@ function setupModeToggle() {
   }
 }
 
-// Источники, которые выигрывают от per-level хинта в artist-режиме
-// (соцсети/арт-платформы/фото-стоки/reddit). Музеи и архивы НЕ
-// включаем — они индексируют по периодам/художникам, и слова вроде
-// "reference"/"study" режут полезную выдачу.
-const ARTIST_BEGINNER_HINT_SOURCES = new Set([
-  'reddit', 'pinterest', 'tumblr', 'tumblr-curated',
-  'deviantart', 'artstation',
-  'unsplash', 'pexels', 'pixabay', 'flickr',
-  'arena', 'arena-tags', 'cosmos',
-]);
-
-// Per-level хинты для artist-режима. 'all' → без модификатора (юзер
-// хочет видеть весь спектр).
-//   beginner    — поднимает референсные фото для рисования с натуры
-//   intermediate — направляет на штудии анатомии/жеста
-//   advanced    — поднимает академические master-studies
-// Регэксп ниже проверяет, не содержит ли уже запрос «художественные»
-// слова — чтобы не дублировать «drawing study reference» из самого
-// тега и не получить мусорные результаты на 4-словном запросе.
-const ARTIST_LEVEL_HINTS = {
-  beginner:     'drawing reference',
-  intermediate: 'anatomy study',
-  advanced:     'master study',
-};
-
-// Phrase-based dedup: пропускаем инжект только если ПОЛНАЯ фраза-хинт
-// уже в запросе. Раньше дедупили по отдельным словам — это резало
-// инжект на тегах, где было «reference» или «study» одиночно (а
-// хинт-фраза целиком отсутствовала).
-function hintDedupRe(hint) {
-  const escaped = String(hint).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-  return new RegExp(`\\b${escaped}\\b`, 'i');
-}
-
-// ============== Designer per-category hints ==============
-// Аналог artist-level-хинтов, но для дизайнера привязан к активной
-// категории (state.activeCategory ≈ activeCategory модульного скоупа).
-// Цель — поднимать UI-релевантность на noisy-источниках при FREE-query
-// (когда юзер пишет своё слово, не кликает по существующему тегу).
-// Музеи и фото-стоки в whitelist не входят: у них нет UI-материала,
-// "ui design" даст пустую/шумную выдачу.
-const DESIGNER_HINT_SOURCES = new Set([
-  'reddit', 'pinterest', 'tumblr', 'tumblr-curated',
-  'deviantart', 'artstation',
-  'arena', 'arena-tags', 'cosmos',
-]);
-const DESIGNER_CATEGORY_HINTS = {
-  'тренды дня':         'award winning',
-  'продукт':            'ui design',
-  'мобайл':             'mobile app',
-  'лендинг':            'landing page',
-  'типографика':        'typography design',
-  'бренд':              'brand identity',
-  'моушн / 3d':         'motion design',
-  'ai-эпоха':           'ai interface',
-  'данные':             'data visualization',
-  'ретро':              'retro interface',
-  'визуальные стили':   'graphic design',
-  'indie / craft':      'indie web design',
-  'веб-эстетика':       'web design',
-  'email и newsletter': 'email design',
-  'onboarding':         'onboarding ui',
-  'settings':           'settings ui',
-  'internal tools':     'admin ui',
-  'edu / learning':     'learning ui',
-  'finance':            'fintech ui',
-  'дизайн-документы':   'design system',
-  'vintage tech':       'vintage interface',
-  'против хайпа':       'minimal text web',
-  'award winners':      'award winning',
-};
-// (Дедуп — через hintDedupRe(DESIGNER_CATEGORY_HINTS[активная]) ниже)
-
-// ============== Aesthetic per-category hints ==============
-// Для эстетики whitelist шире — включаем и фото-стоки (там много
-// aesthetic-photography), и музеи (Met / Wikiart имеют interior/light-
-// фото, хорошо реагируют на photography-suffix).
-const AESTHETIC_HINT_SOURCES = new Set([
-  'unsplash', 'pexels', 'pixabay', 'flickr',
-  'reddit', 'pinterest', 'tumblr', 'tumblr-curated',
-  'arena', 'arena-tags', 'cosmos',
-  'met', 'wikiart', 'wikimedia', 'iarchive', 'artvee',
-  'europeana', 'smithsonian', 'nypl',
-]);
-const AESTHETIC_CATEGORY_HINTS = {
-  'утренний свет':         'morning light',
-  'неспешные вещи':        'slow living aesthetic',
-  'другая жизнь':          'real home interior',
-  'носители времени':      'vintage object',
-  'чистая форма':          'minimalist',
-  'кадры из кино':         'film still',
-  'стол накрыт':           'food photography',
-  'дикое и зелёное':       'garden photography',
-  'печатное':              'print design',
-  'у воды':                'water photography',
-  'бумага и дерево':       'books aesthetic',
-  'вечерний свет':         'evening light',
-  'архитектурные паузы':   'architecture photography',
-  'русское тихое':         'soviet aesthetic',
-  'долгий разговор':       'intimate evening',
-};
-// (Дедуп — через hintDedupRe(AESTHETIC_CATEGORY_HINTS[активная]) ниже)
-
-// Inject mode-specific modifiers into the query passed to a source.
-//   artist     — per-level хинт (drawing reference / anatomy study / master study)
-//   designer   — per-category hint + platform / domain / dribbble (фильтр-row)
-//   aesthetic  — per-category hint (photography / aesthetic / interior / …)
-//   bell       — нет авто-хинтов
+// Inject hidden " dribbble" modifier for select sources in designer mode
 function effectiveQueryFor(srcId, query) {
+  if (state.mode !== 'designer') return query;
+  // Фото-стоки, музеи, архивы и NFT — не индексируют слова `web`/`mobile`/
+  // `b2b`/`consumer`. Длинная фраза с ними даёт либо 0, либо случайный шум.
+  if (NO_DESIGNER_INJECTION_SOURCES.has(srcId)) return query;
   let q = query;
-
-  // Artist mode — per-level хинт. Дедупим по ПОЛНОЙ фразе хинта, не по
-  // отдельным словам — иначе тег вроде «hand reference closeup» не
-  // получал бы «drawing reference», хотя должен.
-  if (state.mode === 'artist' && ARTIST_BEGINNER_HINT_SOURCES.has(srcId)) {
-    const hint = ARTIST_LEVEL_HINTS[state.artistLevel];
-    if (hint && !hintDedupRe(hint).test(q)) {
-      q = `${q} ${hint}`;
-    }
+  // Inject platform / domain modifiers chosen via filter-row.
+  const platform = state.designerPlatform;
+  if (platform && platform !== 'all' && !new RegExp(`\\b${platform}\\b`, 'i').test(q)) {
+    q = `${q} ${platform}`;
   }
-
-  // Designer mode.
-  if (state.mode === 'designer') {
-    // Category hint — на noisy-источниках, дедуп по полной фразе.
-    if (DESIGNER_HINT_SOURCES.has(srcId) && typeof activeCategory !== 'undefined') {
-      const hint = DESIGNER_CATEGORY_HINTS[activeCategory];
-      if (hint && !hintDedupRe(hint).test(q)) {
-        q = `${q} ${hint}`;
-      }
-    }
-    // Platform/domain/dribbble — как было.
-    if (!NO_DESIGNER_INJECTION_SOURCES.has(srcId)) {
-      const platform = state.designerPlatform;
-      if (platform && platform !== 'all' && !new RegExp(`\\b${platform}\\b`, 'i').test(q)) {
-        q = `${q} ${platform}`;
-      }
-      const domain = state.designerDomain;
-      if (domain && domain !== 'all' && !new RegExp(`\\b${domain}\\b`, 'i').test(q)) {
-        q = `${q} ${domain}`;
-      }
-      if (DESIGNER_DRIBBBLE_HINT_SOURCES.has(srcId) && !/\bdribbble\b/i.test(q)) {
-        q = `${q} dribbble`;
-      }
-    }
+  const domain = state.designerDomain;
+  if (domain && domain !== 'all' && !new RegExp(`\\b${domain}\\b`, 'i').test(q)) {
+    q = `${q} ${domain}`;
   }
-
-  // Aesthetic mode — per-category mood/medium хинт.
-  if (state.mode === 'aesthetic'
-      && AESTHETIC_HINT_SOURCES.has(srcId)
-      && typeof activeCategory !== 'undefined') {
-    const hint = AESTHETIC_CATEGORY_HINTS[activeCategory];
-    if (hint && !hintDedupRe(hint).test(q)) {
-      q = `${q} ${hint}`;
-    }
+  // Existing dribbble hint for select sources only.
+  if (DESIGNER_DRIBBBLE_HINT_SOURCES.has(srcId) && !/\bdribbble\b/i.test(q)) {
+    q = `${q} dribbble`;
   }
-
   return q;
 }
 
@@ -14253,7 +13674,7 @@ window.setRitualMode = function (mode) {
     // Никаких автозапросов на старт — юзер видит чистое поле + placeholder,
     // empty-state с предложенными тегами активного раздела. Поиск стартует
     // только когда юзер сам что-то выбрал или ввёл.
-    if (state.query) search(state.query, false, { trigger: 'init' });
+    if (state.query) search(state.query);
     else renderCard();   // показать idle empty-state
   } catch(e) {
     document.getElementById('card-stack').innerHTML =
