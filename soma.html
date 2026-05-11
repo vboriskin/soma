@@ -12915,7 +12915,15 @@ const ARTIST_LEVEL_HINTS = {
   intermediate: 'anatomy study',
   advanced:     'master study',
 };
-const ARTIST_HINT_DEDUP_RE = /\b(drawing|reference|ref|anatomy|gesture|study|sketch|master)\b/i;
+
+// Phrase-based dedup: пропускаем инжект только если ПОЛНАЯ фраза-хинт
+// уже в запросе. Раньше дедупили по отдельным словам — это резало
+// инжект на тегах, где было «reference» или «study» одиночно (а
+// хинт-фраза целиком отсутствовала).
+function hintDedupRe(hint) {
+  const escaped = String(hint).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`\\b${escaped}\\b`, 'i');
+}
 
 // ============== Designer per-category hints ==============
 // Аналог artist-level-хинтов, но для дизайнера привязан к активной
@@ -12954,7 +12962,7 @@ const DESIGNER_CATEGORY_HINTS = {
   'против хайпа':       'minimal text web',
   'award winners':      'award winning',
 };
-const DESIGNER_HINT_DEDUP_RE = /\b(ui|interface|design|page|app|landing|brand|identity|logo|wordmark|monogram|dashboard|fintech|admin|saas|web|portfolio|website|email|onboarding|typography|font|specimen|chart|graph|sparkline|system|tokens|component|library|aesthetic)\b/i;
+// (Дедуп — через hintDedupRe(DESIGNER_CATEGORY_HINTS[активная]) ниже)
 
 // ============== Aesthetic per-category hints ==============
 // Для эстетики whitelist шире — включаем и фото-стоки (там много
@@ -12984,7 +12992,7 @@ const AESTHETIC_CATEGORY_HINTS = {
   'русское тихое':         'soviet aesthetic',
   'долгий разговор':       'intimate evening',
 };
-const AESTHETIC_HINT_DEDUP_RE = /\b(aesthetic|interior|photography|still\s*life|painting|design|garden|architecture|cinematography|stills|wallpaper|landscape|portrait|light|mood)\b/i;
+// (Дедуп — через hintDedupRe(AESTHETIC_CATEGORY_HINTS[активная]) ниже)
 
 // Inject mode-specific modifiers into the query passed to a source.
 //   artist     — per-level хинт (drawing reference / anatomy study / master study)
@@ -12994,23 +13002,24 @@ const AESTHETIC_HINT_DEDUP_RE = /\b(aesthetic|interior|photography|still\s*life|
 function effectiveQueryFor(srcId, query) {
   let q = query;
 
-  // Artist mode — per-level хинт.
-  if (state.mode === 'artist'
-      && ARTIST_BEGINNER_HINT_SOURCES.has(srcId)
-      && ARTIST_LEVEL_HINTS[state.artistLevel]
-      && !ARTIST_HINT_DEDUP_RE.test(q)) {
-    q = `${q} ${ARTIST_LEVEL_HINTS[state.artistLevel]}`;
+  // Artist mode — per-level хинт. Дедупим по ПОЛНОЙ фразе хинта, не по
+  // отдельным словам — иначе тег вроде «hand reference closeup» не
+  // получал бы «drawing reference», хотя должен.
+  if (state.mode === 'artist' && ARTIST_BEGINNER_HINT_SOURCES.has(srcId)) {
+    const hint = ARTIST_LEVEL_HINTS[state.artistLevel];
+    if (hint && !hintDedupRe(hint).test(q)) {
+      q = `${q} ${hint}`;
+    }
   }
 
   // Designer mode.
   if (state.mode === 'designer') {
-    // Category hint — на free-query внутри раздела. Дедуп вырубает, если
-    // запрос уже содержит UI/design/page и т.п.
-    if (DESIGNER_HINT_SOURCES.has(srcId)
-        && typeof activeCategory !== 'undefined'
-        && DESIGNER_CATEGORY_HINTS[activeCategory]
-        && !DESIGNER_HINT_DEDUP_RE.test(q)) {
-      q = `${q} ${DESIGNER_CATEGORY_HINTS[activeCategory]}`;
+    // Category hint — на noisy-источниках, дедуп по полной фразе.
+    if (DESIGNER_HINT_SOURCES.has(srcId) && typeof activeCategory !== 'undefined') {
+      const hint = DESIGNER_CATEGORY_HINTS[activeCategory];
+      if (hint && !hintDedupRe(hint).test(q)) {
+        q = `${q} ${hint}`;
+      }
     }
     // Platform/domain/dribbble — как было.
     if (!NO_DESIGNER_INJECTION_SOURCES.has(srcId)) {
@@ -13028,13 +13037,14 @@ function effectiveQueryFor(srcId, query) {
     }
   }
 
-  // Aesthetic mode — per-category mood/medium hint.
+  // Aesthetic mode — per-category mood/medium хинт.
   if (state.mode === 'aesthetic'
       && AESTHETIC_HINT_SOURCES.has(srcId)
-      && typeof activeCategory !== 'undefined'
-      && AESTHETIC_CATEGORY_HINTS[activeCategory]
-      && !AESTHETIC_HINT_DEDUP_RE.test(q)) {
-    q = `${q} ${AESTHETIC_CATEGORY_HINTS[activeCategory]}`;
+      && typeof activeCategory !== 'undefined') {
+    const hint = AESTHETIC_CATEGORY_HINTS[activeCategory];
+    if (hint && !hintDedupRe(hint).test(q)) {
+      q = `${q} ${hint}`;
+    }
   }
 
   return q;
