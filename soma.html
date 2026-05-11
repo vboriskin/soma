@@ -12917,15 +12917,84 @@ const ARTIST_LEVEL_HINTS = {
 };
 const ARTIST_HINT_DEDUP_RE = /\b(drawing|reference|ref|anatomy|gesture|study|sketch|master)\b/i;
 
+// ============== Designer per-category hints ==============
+// Аналог artist-level-хинтов, но для дизайнера привязан к активной
+// категории (state.activeCategory ≈ activeCategory модульного скоупа).
+// Цель — поднимать UI-релевантность на noisy-источниках при FREE-query
+// (когда юзер пишет своё слово, не кликает по существующему тегу).
+// Музеи и фото-стоки в whitelist не входят: у них нет UI-материала,
+// "ui design" даст пустую/шумную выдачу.
+const DESIGNER_HINT_SOURCES = new Set([
+  'reddit', 'pinterest', 'tumblr', 'tumblr-curated',
+  'deviantart', 'artstation',
+  'arena', 'arena-tags', 'cosmos',
+]);
+const DESIGNER_CATEGORY_HINTS = {
+  'тренды дня':         'award winning',
+  'продукт':            'ui design',
+  'мобайл':             'mobile app',
+  'лендинг':            'landing page',
+  'типографика':        'typography design',
+  'бренд':              'brand identity',
+  'моушн / 3d':         'motion design',
+  'ai-эпоха':           'ai interface',
+  'данные':             'data visualization',
+  'ретро':              'retro interface',
+  'визуальные стили':   'graphic design',
+  'indie / craft':      'indie web design',
+  'веб-эстетика':       'web design',
+  'email и newsletter': 'email design',
+  'onboarding':         'onboarding ui',
+  'settings':           'settings ui',
+  'internal tools':     'admin ui',
+  'edu / learning':     'learning ui',
+  'finance':            'fintech ui',
+  'дизайн-документы':   'design system',
+  'vintage tech':       'vintage interface',
+  'против хайпа':       'minimal text web',
+  'award winners':      'award winning',
+};
+const DESIGNER_HINT_DEDUP_RE = /\b(ui|interface|design|page|app|landing|brand|identity|logo|wordmark|monogram|dashboard|fintech|admin|saas|web|portfolio|website|email|onboarding|typography|font|specimen|chart|graph|sparkline|system|tokens|component|library|aesthetic)\b/i;
+
+// ============== Aesthetic per-category hints ==============
+// Для эстетики whitelist шире — включаем и фото-стоки (там много
+// aesthetic-photography), и музеи (Met / Wikiart имеют interior/light-
+// фото, хорошо реагируют на photography-suffix).
+const AESTHETIC_HINT_SOURCES = new Set([
+  'unsplash', 'pexels', 'pixabay', 'flickr',
+  'reddit', 'pinterest', 'tumblr', 'tumblr-curated',
+  'arena', 'arena-tags', 'cosmos',
+  'met', 'wikiart', 'wikimedia', 'iarchive', 'artvee',
+  'europeana', 'smithsonian', 'nypl',
+]);
+const AESTHETIC_CATEGORY_HINTS = {
+  'утренний свет':         'morning light',
+  'неспешные вещи':        'slow living aesthetic',
+  'другая жизнь':          'real home interior',
+  'носители времени':      'vintage object',
+  'чистая форма':          'minimalist',
+  'кадры из кино':         'film still',
+  'стол накрыт':           'food photography',
+  'дикое и зелёное':       'garden photography',
+  'печатное':              'print design',
+  'у воды':                'water photography',
+  'бумага и дерево':       'books aesthetic',
+  'вечерний свет':         'evening light',
+  'архитектурные паузы':   'architecture photography',
+  'русское тихое':         'soviet aesthetic',
+  'долгий разговор':       'intimate evening',
+};
+const AESTHETIC_HINT_DEDUP_RE = /\b(aesthetic|interior|photography|still\s*life|painting|design|garden|architecture|cinematography|stills|wallpaper|landscape|portrait|light|mood)\b/i;
+
 // Inject mode-specific modifiers into the query passed to a source.
-// Сейчас обрабатываем два режима:
-//   designer  — platform / domain / dribbble hint (см. фильтр-row).
-//   artist (beginner) — append "drawing reference" на noisy-источниках,
-//                       если запрос ещё не содержит drawing/reference/ref.
+//   artist     — per-level хинт (drawing reference / anatomy study / master study)
+//   designer   — per-category hint + platform / domain / dribbble (фильтр-row)
+//   aesthetic  — per-category hint (photography / aesthetic / interior / …)
+//   bell       — нет авто-хинтов
 function effectiveQueryFor(srcId, query) {
   let q = query;
 
-  // Artist mode — per-level хинт (см. ARTIST_LEVEL_HINTS).
+  // Artist mode — per-level хинт.
   if (state.mode === 'artist'
       && ARTIST_BEGINNER_HINT_SOURCES.has(srcId)
       && ARTIST_LEVEL_HINTS[state.artistLevel]
@@ -12933,19 +13002,39 @@ function effectiveQueryFor(srcId, query) {
     q = `${q} ${ARTIST_LEVEL_HINTS[state.artistLevel]}`;
   }
 
-  // Designer mode — platform/domain/dribbble injections.
-  if (state.mode === 'designer' && !NO_DESIGNER_INJECTION_SOURCES.has(srcId)) {
-    const platform = state.designerPlatform;
-    if (platform && platform !== 'all' && !new RegExp(`\\b${platform}\\b`, 'i').test(q)) {
-      q = `${q} ${platform}`;
+  // Designer mode.
+  if (state.mode === 'designer') {
+    // Category hint — на free-query внутри раздела. Дедуп вырубает, если
+    // запрос уже содержит UI/design/page и т.п.
+    if (DESIGNER_HINT_SOURCES.has(srcId)
+        && typeof activeCategory !== 'undefined'
+        && DESIGNER_CATEGORY_HINTS[activeCategory]
+        && !DESIGNER_HINT_DEDUP_RE.test(q)) {
+      q = `${q} ${DESIGNER_CATEGORY_HINTS[activeCategory]}`;
     }
-    const domain = state.designerDomain;
-    if (domain && domain !== 'all' && !new RegExp(`\\b${domain}\\b`, 'i').test(q)) {
-      q = `${q} ${domain}`;
+    // Platform/domain/dribbble — как было.
+    if (!NO_DESIGNER_INJECTION_SOURCES.has(srcId)) {
+      const platform = state.designerPlatform;
+      if (platform && platform !== 'all' && !new RegExp(`\\b${platform}\\b`, 'i').test(q)) {
+        q = `${q} ${platform}`;
+      }
+      const domain = state.designerDomain;
+      if (domain && domain !== 'all' && !new RegExp(`\\b${domain}\\b`, 'i').test(q)) {
+        q = `${q} ${domain}`;
+      }
+      if (DESIGNER_DRIBBBLE_HINT_SOURCES.has(srcId) && !/\bdribbble\b/i.test(q)) {
+        q = `${q} dribbble`;
+      }
     }
-    if (DESIGNER_DRIBBBLE_HINT_SOURCES.has(srcId) && !/\bdribbble\b/i.test(q)) {
-      q = `${q} dribbble`;
-    }
+  }
+
+  // Aesthetic mode — per-category mood/medium hint.
+  if (state.mode === 'aesthetic'
+      && AESTHETIC_HINT_SOURCES.has(srcId)
+      && typeof activeCategory !== 'undefined'
+      && AESTHETIC_CATEGORY_HINTS[activeCategory]
+      && !AESTHETIC_HINT_DEDUP_RE.test(q)) {
+    q = `${q} ${AESTHETIC_CATEGORY_HINTS[activeCategory]}`;
   }
 
   return q;
