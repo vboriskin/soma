@@ -11086,17 +11086,27 @@ document.querySelectorAll('.modal-backdrop').forEach(m => {
 // слушаем 'controllerchange' и тихо перезагружаем страницу один раз,
 // чтобы юзер сразу увидел свежую версию без дополнительных кликов.
 if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
+  // Очистка legacy-флага из предыдущей реализации controllerchange-листенера
+  // (он блокировал авто-reload после первого обновления в сессии).
+  try { sessionStorage.removeItem('soma.swReloaded'); } catch (e) {}
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
       try { reg.update(); } catch (e) {}
+      // Дополнительный update-чек: когда юзер возвращается на вкладку
+      // после долгого отсутствия — спрашиваем у браузера свежий sw.js.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          try { reg.update(); } catch (e) {}
+        }
+      });
     }).catch(() => {});
-    // Авто-релоад при смене активного SW. Защита от петли через
-    // sessionStorage флаг — релоадим один раз за сессию.
+    // Авто-релоад при смене активного SW. Защита от петли только
+    // в рамках текущей загрузки (in-closure boolean) — после reload
+    // страница стартует заново с чистым `reloading=false`, так что
+    // СЛЕДУЮЩИЕ обновления SW тоже сработают.
     let reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (reloading) return;
-      if (sessionStorage.getItem('soma.swReloaded') === '1') return;
-      sessionStorage.setItem('soma.swReloaded', '1');
       reloading = true;
       location.reload();
     });
