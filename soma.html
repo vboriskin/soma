@@ -5354,15 +5354,93 @@ function historyLog(type, payload) {
 // Источник правды — бэк; локальный storage — кеш для быстрого старта и
 // офлайна. На каждую запись отправляем fire-and-forget POST.
 
+// ============== History outbox (recovery от network/CORS errors) ==============
+// Если push history-события упал — кладём его в LS-очередь и пытаемся
+// переслать позже (при следующем успешном push'е, на visibility,
+// или периодически). Защищает от потерь при сбоях CORS/сети/бэка.
+// Хранит до 500 событий (FIFO drop при переполнении).
+const HISTORY_OUTBOX_LS = 'rs:historyOutbox';
+const HISTORY_OUTBOX_MAX = 500;
+
+function _outboxLoad() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_OUTBOX_LS) || '[]'); }
+  catch { return []; }
+}
+function _outboxSave(items) {
+  try { localStorage.setItem(HISTORY_OUTBOX_LS, JSON.stringify(items)); }
+  catch (e) {
+    // Quota — отрезаем половину старых.
+    if (items.length > 1) {
+      const half = items.slice(-Math.floor(items.length / 2));
+      try { localStorage.setItem(HISTORY_OUTBOX_LS, JSON.stringify(half)); } catch {}
+    }
+  }
+}
+function outboxAdd(event) {
+  if (!event || !event.id) return;
+  const items = _outboxLoad();
+  if (items.some(e => e.id === event.id)) return;   // dedup по id
+  items.push(event);
+  if (items.length > HISTORY_OUTBOX_MAX) {
+    items.splice(0, items.length - HISTORY_OUTBOX_MAX);
+  }
+  _outboxSave(items);
+}
+
+let _outboxFlushing = false;
+async function outboxFlush() {
+  if (_outboxFlushing) return;
+  if (!CLIENT_ID) return;
+  const items = _outboxLoad();
+  if (!items.length) return;
+  _outboxFlushing = true;
+  const remaining = [];
+  let sent = 0;
+  for (const ev of items) {
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/state/history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ev),
+      });
+      if (r.ok) { sent++; continue; }
+      if (r.status === 401 || r.status === 403) {
+        // Авторизация — нет смысла дёргать остальные сейчас.
+        remaining.push(ev);
+        break;
+      }
+      remaining.push(ev);
+    } catch (e) {
+      remaining.push(ev);
+      break;   // сеть упала — стоп до следующего раза
+    }
+  }
+  _outboxSave(remaining);
+  _outboxFlushing = false;
+  if (sent) console.log(`[outbox] flushed ${sent}/${items.length} history events`);
+}
+
 async function pushHistoryEventToBackend(ev) {
   if (!CLIENT_ID || !ev) return;
   try {
-    await fetch(`${BACKEND_URL}/api/state/history`, {
+    const r = await fetch(`${BACKEND_URL}/api/state/history`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ev),
     });
-  } catch (e) { /* offline / 401 — копия осталась в LS, перешлёшь позже */ }
+    if (r.ok) {
+      // Удачный push — пробуем слить накопившийся outbox (один раз; если
+      // там что-то застряло после восстановления сети).
+      if (_outboxLoad().length) outboxFlush();
+      return;
+    }
+    // 401 — alpha-gate, ключ не даст пройти — в outbox смысла мало,
+    // но всё-таки сохраним: пусть юзер залогинится → flush на init.
+    outboxAdd(ev);
+  } catch (e) {
+    // Network error (CORS / offline / timeout) — на retry.
+    outboxAdd(ev);
+  }
 }
 
 async function pullHistoryFromBackend() {
@@ -13621,6 +13699,21 @@ window.setRitualMode = function (mode) {
       ]),
       new Promise(resolve => setTimeout(resolve, 2500)),
     ]);
+    // Слить outbox (если в прошлой сессии события не доехали из-за сбоя).
+    // Fire-and-forget — не блокируем UI.
+    if (typeof outboxFlush === 'function') outboxFlush();
+    // И ещё дёргаем каждые 60 сек если что-то скопилось (а юзер сидит
+    // на странице долго в офлайне → онлайне).
+    setInterval(() => {
+      if (typeof outboxFlush === 'function') outboxFlush();
+    }, 60_000);
+    // На return-to-tab — тоже flush (часто работает: юзер ушёл в офлайн,
+    // вернулся в онлайн, открыл вкладку).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && typeof outboxFlush === 'function') {
+        outboxFlush();
+      }
+    });
     // Никаких автозапросов на старт — юзер видит чистое поле + placeholder,
     // empty-state с предложенными тегами активного раздела. Поиск стартует
     // только когда юзер сам что-то выбрал или ввёл.

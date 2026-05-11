@@ -57,16 +57,26 @@ export async function readHistory(clientId, { since = 0, limit = 1000 } = {}) {
   let text;
   try { text = await fs.readFile(file, 'utf8'); }
   catch (e) { if (e.code === 'ENOENT') return []; throw e; }
+  // Дедуп по id: retry'и из client outbox могут попасть на сервер дважды
+  // (если 200 не доехал клиенту). Append-only файл всё-равно содержит
+  // дубль, но при чтении мы возвращаем уникальные. Compaction отложен —
+  // на низком объёме рост незначителен.
   const events = [];
+  const seenIds = new Set();
   for (const line of text.split('\n')) {
     if (!line) continue;
     try {
       const ev = JSON.parse(line);
-      if (ev && ev.ts >= since) events.push(ev);
+      if (!ev) continue;
+      if (ev.id) {
+        if (seenIds.has(ev.id)) continue;
+        seenIds.add(ev.id);
+      }
+      if (ev.ts >= since) events.push(ev);
     } catch {}
   }
-  // Берём последние `limit` (после фильтра по since) — для пагинации
-  // достаточно простого slice'а; нагрузка низкая.
+  // Берём последние `limit` (после дедупа+фильтра по since) — для
+  // пагинации достаточно простого slice'а; нагрузка низкая.
   return events.slice(-limit);
 }
 
