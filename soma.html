@@ -12891,17 +12891,31 @@ function setupModeToggle() {
   }
 }
 
-// Источники, которые при artist+beginner выигрывают от хинта
-// "drawing reference" (соцсети/арт-платформы/фото-стоки/reddit). Музеи
-// и архивы НЕ включаем — они индексируют по периодам/художникам, и
-// слово "reference" режет полезную выдачу. Cosmos/Are.na в whitelist
-// тоже, там reference-доски популярны.
+// Источники, которые выигрывают от per-level хинта в artist-режиме
+// (соцсети/арт-платформы/фото-стоки/reddit). Музеи и архивы НЕ
+// включаем — они индексируют по периодам/художникам, и слова вроде
+// "reference"/"study" режут полезную выдачу.
 const ARTIST_BEGINNER_HINT_SOURCES = new Set([
   'reddit', 'pinterest', 'tumblr', 'tumblr-curated',
   'deviantart', 'artstation',
   'unsplash', 'pexels', 'pixabay', 'flickr',
   'arena', 'arena-tags', 'cosmos',
 ]);
+
+// Per-level хинты для artist-режима. 'all' → без модификатора (юзер
+// хочет видеть весь спектр).
+//   beginner    — поднимает референсные фото для рисования с натуры
+//   intermediate — направляет на штудии анатомии/жеста
+//   advanced    — поднимает академические master-studies
+// Регэксп ниже проверяет, не содержит ли уже запрос «художественные»
+// слова — чтобы не дублировать «drawing study reference» из самого
+// тега и не получить мусорные результаты на 4-словном запросе.
+const ARTIST_LEVEL_HINTS = {
+  beginner:     'drawing reference',
+  intermediate: 'anatomy study',
+  advanced:     'master study',
+};
+const ARTIST_HINT_DEDUP_RE = /\b(drawing|reference|ref|anatomy|gesture|study|sketch|master)\b/i;
 
 // Inject mode-specific modifiers into the query passed to a source.
 // Сейчас обрабатываем два режима:
@@ -12911,12 +12925,12 @@ const ARTIST_BEGINNER_HINT_SOURCES = new Set([
 function effectiveQueryFor(srcId, query) {
   let q = query;
 
-  // Artist beginner level — мягкая подсказка "drawing reference".
+  // Artist mode — per-level хинт (см. ARTIST_LEVEL_HINTS).
   if (state.mode === 'artist'
-      && state.artistLevel === 'beginner'
       && ARTIST_BEGINNER_HINT_SOURCES.has(srcId)
-      && !/\b(drawing|reference|ref)\b/i.test(q)) {
-    q = `${q} drawing reference`;
+      && ARTIST_LEVEL_HINTS[state.artistLevel]
+      && !ARTIST_HINT_DEDUP_RE.test(q)) {
+    q = `${q} ${ARTIST_LEVEL_HINTS[state.artistLevel]}`;
   }
 
   // Designer mode — platform/domain/dribbble injections.
