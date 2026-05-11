@@ -59,7 +59,12 @@ export async function searchArtvee(query) {
     const m = html.match(/<ul[^>]*class="[^"]*\bproducts\b[^"]*"[^>]*>([\s\S]*?)<\/ul>/i);
     const scope = m ? m[1] : html;
     const harvest = harvestImages(scope, { limit: 30, baseHost: 'artvee.com' })
-      .filter(i => /artvee\.com|cloudfront/i.test(i.url));
+      .filter(i => /artvee\.com|cloudfront/i.test(i.url))
+      // Анализ скрытых событий: artvee стабильно подмешивает свой лого
+      // (`/logob*.png`) и заглавную обложку с title="Artvee" в выдачу
+      // 1-м/2-м элементом. Срезаем.
+      .filter(i => !/\/logob|\/logo[-_.]/i.test(i.url))
+      .filter(i => !/^artvee$/i.test((i.title || '').trim()));
     if (!harvest.length) {
       console.warn('[artvee] no items parsed — markup likely changed');
       return [];
@@ -186,8 +191,11 @@ export async function searchCosmos(query) {
     }
     // Cosmos хранит превью в s3.amazonaws.com/cosmos-* и img.cosmos.so/.
     // Avatars — `/profile-pictures/` или `/users/`. Их фильтруем.
+    // Также Cosmos рендерит generic placeholder-карточки с alt="Cluster element"
+    // (это UI-элементы интерфейса, а не контент). Срезаем по title.
     const harvest = harvestImages(html, { limit: 60, baseHost: 'cosmos.so' })
-      .filter(i => !/avatars|profile-pictures|\/users\//.test(i.url));
+      .filter(i => !/avatars|profile-pictures|\/users\//.test(i.url))
+      .filter(i => !/^cluster element$/i.test((i.title || '').trim()));
     if (!harvest.length) {
       console.warn('[cosmos] headless rendered but no items found — markup likely changed');
       return [];
@@ -325,7 +333,11 @@ export async function searchFigmaCommunity(query) {
     });
     if (!html) return [];
     const harvest = harvestImages(html, { limit: 30 })
-      .filter(i => /figma\.com|s3-figma/.test(i.url));
+      .filter(i => /figma\.com|s3-figma/.test(i.url))
+      // Анализ hide-событий: figma подмешивает иконки плагинов / template-cards
+      // (`PluginIcon`, `plugin_icon`, `icon-`) и hero-аватарки. Срезаем.
+      .filter(i => !/PluginIcon|plugin_icon|plugin-icon/i.test(i.title || ''))
+      .filter(i => !/\/plugin_icons?\/|\/plugin-icons?\//i.test(i.url));
     if (!harvest.length) {
       console.warn('[figma-community] no items parsed — SPA-rendered');
       return [];
