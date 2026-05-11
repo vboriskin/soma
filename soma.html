@@ -1576,7 +1576,38 @@
     }
     /* card-stack может занять всю vertical space — нет actions снизу. */
     body[data-layout="side"] .card-stack { margin-bottom: 0; }
+    /* Мини-подпись (автор · источник) под кнопкой «скрыть» в side-layout.
+       Небольшой отступ сверху, тонкий шрифт, ink-soft. В below-layout
+       прячем — там автор уже виден в caption под картинкой. */
+    body[data-layout="side"] .action-meta {
+      display: block;
+      margin-top: 16px;
+      max-width: 180px;
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--ink-soft);
+      pointer-events: auto;
+    }
+    body[data-layout="side"] .action-meta .meta-author {
+      color: var(--ink-mid);
+      display: block;
+      margin-bottom: 2px;
+    }
+    body[data-layout="side"] .action-meta a {
+      color: inherit;
+      border-bottom: 0.5px solid transparent;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    body[data-layout="side"] .action-meta a:hover {
+      color: var(--ink);
+      border-bottom-color: var(--ink);
+    }
   }
+  /* По умолчанию (и в below-layout) — скрыт. */
+  .action-meta { display: none; }
   .hide-menu .hide-menu-title { color: var(--ink-soft); }
   .hide-menu .hide-menu-sep { color: var(--ink-soft); }
   .hide-menu .text-link { font-size: 12px; }
@@ -2548,6 +2579,10 @@
     <button class="action-btn like" id="btn-like">сохранить</button>
     <span class="action-btn divider hide-divider">·</span>
     <button class="action-btn hide" id="btn-hide" title="скрыть эту картинку, автора или источник">скрыть ×</button>
+    <!-- Под «скрыть» — мини-подпись с автором и источником текущей карты.
+         Только в side-layout (CSS прячет в below-layout, где автор уже
+         виден в caption под картинкой). -->
+    <div class="action-meta" id="action-meta" aria-hidden="true"></div>
   </div>
 
   <!-- Hide submenu — поверх actions при клике на «× скрыть». Только в стопке.
@@ -7596,6 +7631,9 @@ function renderCard() {
       });
     });
     state.current = null;
+    // Очистим мини-подпись под «скрыть» (нет карты — нечего показывать).
+    const metaEl = document.getElementById('action-meta');
+    if (metaEl) metaEl.innerHTML = '';
     return;
   }
 
@@ -7715,6 +7753,19 @@ function renderCard() {
       if (mode === 'author') openAuthorStack(it);
       else if (mode === 'similar') openSimilarSearch(it);
     };
+  }
+
+  // Мини-подпись под кнопкой «скрыть» (side-layout). В below-layout
+  // элемент скрыт через CSS — автор там и так виден в caption.
+  const meta = document.getElementById('action-meta');
+  if (meta) {
+    const author = state.current.author || '';
+    const srcHref = state.current.pageUrl || '#';
+    const srcText = state.current.source || '';
+    meta.innerHTML = author || srcText
+      ? `${author ? `<span class="meta-author">${escapeHtml(author)}</span>` : ''}` +
+        `${srcText ? `<a href="${escapeHtml(srcHref)}" target="_blank" rel="noopener noreferrer">${escapeHtml(srcText)}</a>` : ''}`
+      : '';
   }
 
   renderCardTimer();
