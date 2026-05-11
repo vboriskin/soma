@@ -3520,7 +3520,10 @@ const SOURCES = [
   // Музеи/архивы — в designer'е возвращают историческое искусство,
   // не современный UI. По умолчанию off для designer, оставлены для aesthetic.
   { id: 'wikiart',         name: 'WikiArt',         needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true } },
-  { id: 'iarchive',        name: 'Internet Archive', needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true } },
+  // iarchive: для дизайн-режима выключен; в aesthetic тоже off — анализ
+  // hide-событий показал, что архив часто возвращает текстовые обложки книг
+  // ("Screenshot 14", "Nintendo DS"), не визуальный контент.
+  { id: 'iarchive',        name: 'Internet Archive', needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true, aesthetic: true } },
   { id: 'nypl',            name: 'NYPL',            needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: { designer: true } },
   { id: 'opensea',         name: 'OpenSea',         needsKey: false, viaBackend: true, modes: ['designer'] },
   { id: 'awwwards-rss',    name: 'Awwwards RSS',    needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
@@ -3604,9 +3607,12 @@ const MODES = {
   aesthetic: {
     defaultQuery: 'morning light interior',
     placeholder:  'на что посмотреть…',
-    // Curated set leaning toward editorial / Cereal-Apartamento sensibility,
-    // away from r/CozyPlaces / r/MostBeautiful Pinterest-tier defaults.
-    defaultSubs:  ['MostBeautiful','AccidentalRenaissance','AbandonedPorn','CityPorn','VillagePorn','MovieDetails','ArtefactPorn','ImaginaryArchitecture','BookPorn','DesignPorn'],
+    // Curated set leaning toward editorial / Cereal-Apartamento sensibility.
+    // Анализ hide-событий (2026-05-11): AbandonedPorn / CityPorn / VillagePorn /
+    // MostBeautiful давали слишком много туристического / разваленных зданий —
+    // off-topic для эстетики. Заменили на сабы с осмысленным визуальным
+    // тоном (interior / film / book / spaces).
+    defaultSubs:  ['AccidentalRenaissance','MovieDetails','ArtefactPorn','ImaginaryArchitecture','BookPorn','DesignPorn','CozyPlaces','RoomPorn','InteriorDesign','filmphotography'],
   },
   // Скрытый режим — доступен только держателям BELL_KEY (capability bell:true
   // из /api/info). По умолчанию не виден в mode-toggle. Sub-list пустой —
@@ -5603,6 +5609,17 @@ function loadState() {
       localStorage.setItem('rs:sourceCleanupV1', '1');
     }
   } catch (e) {}
+  // Designer / aesthetic cleanup v2 (2026-05-11): по итогам hide-аналитики
+  // iarchive в эстетике даёт ~много текстовых обложек книг ("Screenshot 14",
+  // "Nintendo DS", "A guide to aesthetics") — non-visual мусор. Отключаем.
+  try {
+    if (!localStorage.getItem('rs:sourceCleanupV2')) {
+      const am = state.enabledSourcesByMode.aesthetic = state.enabledSourcesByMode.aesthetic || {};
+      am['iarchive'] = false;
+      try { storageSet('rs:enabled:aesthetic', JSON.stringify(am)); } catch(e) {}
+      localStorage.setItem('rs:sourceCleanupV2', '1');
+    }
+  } catch (e) {}
   if (legacyEnabled) {
     try { localStorage.removeItem('rs:enabled'); } catch(e) {}
   }
@@ -5784,6 +5801,23 @@ function loadState() {
   if (!state.subsByMode.aesthetic || !state.subsByMode.aesthetic.length) {
     state.subsByMode.aesthetic = MODES.aesthetic.defaultSubs.slice();
   }
+  // Aesthetic subs cleanup v1 (2026-05-11): по анализу hide-событий старые
+  // сабы (AbandonedPorn / CityPorn / VillagePorn / MostBeautiful) давали
+  // off-topic мусор. Если у юзера дефолтный набор — заменяем на новый.
+  // Если кастомил вручную — не трогаем.
+  try {
+    if (!localStorage.getItem('rs:aestheticSubsCleanupV1')) {
+      const OLD_DEFAULT = ['MostBeautiful','AccidentalRenaissance','AbandonedPorn','CityPorn','VillagePorn','MovieDetails','ArtefactPorn','ImaginaryArchitecture','BookPorn','DesignPorn'];
+      const cur = state.subsByMode.aesthetic || [];
+      const isOldDefault = cur.length === OLD_DEFAULT.length &&
+        cur.every((s, i) => String(s).toLowerCase() === String(OLD_DEFAULT[i]).toLowerCase());
+      if (isOldDefault) {
+        state.subsByMode.aesthetic = MODES.aesthetic.defaultSubs.slice();
+        try { storageSet('rs:subs:aesthetic', JSON.stringify(state.subsByMode.aesthetic)); } catch(e) {}
+      }
+      localStorage.setItem('rs:aestheticSubsCleanupV1', '1');
+    }
+  } catch (e) {}
   state.subreddits = state.subsByMode[state.mode];
   state.query = MODES[state.mode].defaultQuery;
   // 1.1.7: mirror seenIds Map для активного mode.
@@ -6986,24 +7020,31 @@ const SOURCE_CLASS = {
   flickr:      { strength: ['concept', 'descriptive', 'mood'] },
   wallhaven:   { strength: ['concept', 'mood', 'style'] },
   openverse:   { strength: ['concept', 'descriptive'] },
-  // Reddit: универсал, любой тип кроме чистых artist (имена не работают в EN-сабах).
-  reddit:      { strength: ['concept', 'descriptive', 'technical', 'mood', 'style'] },
+  // Reddit: универсал. Раньше исключали 'artist' — но многие сабы (ImaginaryX,
+  // Art, etc.) реально индексируют имена. По анализу hide-событий: на artist-
+  // запросах reddit давал релевантные результаты, скип был ложным.
+  reddit:      { strength: ['concept', 'descriptive', 'technical', 'mood', 'style', 'artist'] },
   // Museums / archives: artist + style + historical. На technical → шум.
-  artic:       { strength: ['artist', 'historical', 'style'] },
-  smithsonian: { strength: ['artist', 'historical', 'style'] },
-  met:         { strength: ['artist', 'historical', 'style'] },
-  wikiart:     { strength: ['artist', 'style', 'historical'] },
-  iarchive:    { strength: ['artist', 'historical', 'style', 'concept'] },
-  nypl:        { strength: ['artist', 'historical', 'concept'] },
-  artvee:      { strength: ['artist', 'historical', 'style'] },
+  // Добавляем 'descriptive' + 'concept' — длинные описательные запросы вроде
+  // "morning light still life" вполне находят artworks в met/artic/wikiart.
+  artic:       { strength: ['artist', 'historical', 'style', 'descriptive', 'concept'] },
+  smithsonian: { strength: ['artist', 'historical', 'style', 'descriptive', 'concept'] },
+  met:         { strength: ['artist', 'historical', 'style', 'descriptive', 'concept'] },
+  wikiart:     { strength: ['artist', 'style', 'historical', 'descriptive', 'concept'] },
+  iarchive:    { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
+  nypl:        { strength: ['artist', 'historical', 'concept', 'descriptive'] },
+  artvee:      { strength: ['artist', 'historical', 'style', 'descriptive', 'concept'] },
   // Booru / DA / Tumblr / ArtStation — single-tag, лучше для concept/mood.
   safebooru:   { strength: ['concept', 'mood'] },
-  deviantart:  { strength: ['concept', 'style', 'mood'] },
-  tumblr:      { strength: ['concept', 'mood', 'aesthetic'] },
-  artstation:  { strength: ['concept', 'style', 'technical'] },
+  deviantart:  { strength: ['concept', 'style', 'mood', 'artist'] },
+  // Tumblr — куча художников ведут блоги; имя как тег часто работает.
+  tumblr:      { strength: ['concept', 'mood', 'aesthetic', 'artist'] },
+  artstation:  { strength: ['concept', 'style', 'technical', 'artist'] },
   // Are.na — каналы, лучше всего на стилях и настроениях.
-  arena:       { strength: ['style', 'mood', 'aesthetic', 'concept'] },
-  'arena-tags':{ strength: ['style', 'mood', 'aesthetic', 'concept'] },
+  // arena-tags принимает имя художника как тег (например /tag/basquiat) —
+  // часто отличные подборки. Возвращаем 'artist' в strength.
+  arena:       { strength: ['style', 'mood', 'aesthetic', 'concept', 'artist'] },
+  'arena-tags':{ strength: ['style', 'mood', 'aesthetic', 'concept', 'artist'] },
   // Design-only sources.
   dribbble:        { strength: ['technical', 'concept'] },
   'dribbble-tags': { strength: ['technical', 'concept'] },
