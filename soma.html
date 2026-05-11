@@ -3520,7 +3520,9 @@ const SOURCES = [
   { id: 'fwa',             name: 'FWA',             needsKey: false, viaBackend: true, modes: ['designer'], ignoresQuery: true },
   { id: 'artvee',          name: 'ArtVee',          needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
   { id: 'land-book',       name: 'Land-book',       needsKey: false, viaBackend: true, modes: ['designer'] },
-  { id: 'pinterest',       name: 'Pinterest',       needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
+  // 2026-05-11: Pinterest stable-fails из VDS (8 timeout из 8 в реальной
+  // сессии). Default-off — кто хочет, включит в settings.
+  { id: 'pinterest',       name: 'Pinterest',       needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'], defaultOff: true },
   { id: 'cosmos',          name: 'Cosmos',          needsKey: false, viaBackend: true, modes: ['designer', 'aesthetic'] },
   // posts.cv search скрыт за логином — даже через headless 0. defaultOff.
   { id: 'readcv',          name: 'Read.cv',         needsKey: false, viaBackend: true, modes: ['designer'], defaultOff: true },
@@ -5957,7 +5959,11 @@ function parseRedditResponse(data) {
 }
 
 async function fetchUnsplash(query, key) {
-  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=30&client_id=${encodeURIComponent(key)}`;
+  // В artist+beginner unsplash доминирует impressions (43% от всех), но
+  // имеет высокий skip-rate. Снижаем per_page до 15 — освобождает слоты
+  // для pixabay/pexels/reddit с лучшим dwell-time.
+  const perPage = (state.mode === 'artist' && state.artistLevel === 'beginner') ? 15 : 30;
+  const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=${perPage}&client_id=${encodeURIComponent(key)}`;
   const r = await fetchWithTimeout(url);
   if (!r.ok) throw new Error(`Unsplash ${r.status}`);
   const data = await r.json();
@@ -6962,14 +6968,17 @@ const SOURCE_CLASS = {
   openverse:   { strength: ['concept', 'descriptive'] },
   // Reddit: универсал, любой тип кроме чистых artist (имена не работают в EN-сабах).
   reddit:      { strength: ['concept', 'descriptive', 'technical', 'mood', 'style'] },
-  // Museums / archives: artist + style + historical. На technical → шум.
-  artic:       { strength: ['artist', 'historical', 'style'] },
-  smithsonian: { strength: ['artist', 'historical', 'style'] },
-  met:         { strength: ['artist', 'historical', 'style'] },
-  wikiart:     { strength: ['artist', 'style', 'historical'] },
-  iarchive:    { strength: ['artist', 'historical', 'style', 'concept'] },
-  nypl:        { strength: ['artist', 'historical', 'concept'] },
-  artvee:      { strength: ['artist', 'historical', 'style'] },
+  // Museums / archives: artist + style + historical + concept/descriptive.
+  // Раньше музеи отваливались на «sunlit kitchen warm interior» (intent=
+  // descriptive) — а у них реально есть interior/light/kitchen фото в
+  // коллекциях. Расширил strength, чтобы aesthetic-режим их использовал.
+  artic:       { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
+  smithsonian: { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
+  met:         { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
+  wikiart:     { strength: ['artist', 'style', 'historical', 'concept', 'descriptive'] },
+  iarchive:    { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
+  nypl:        { strength: ['artist', 'historical', 'concept', 'descriptive'] },
+  artvee:      { strength: ['artist', 'historical', 'style', 'concept', 'descriptive'] },
   // Booru / DA / Tumblr / ArtStation — single-tag, лучше для concept/mood.
   safebooru:   { strength: ['concept', 'mood'] },
   deviantart:  { strength: ['concept', 'style', 'mood'] },
@@ -7121,8 +7130,9 @@ const EN_ONLY_SOURCES = new Set([
 // Unsplash/Pexels/Pixabay — обычно <2s, 6s.
 // Met двухступенчатый (search + 24 параллельных fetch'а), 12s.
 const SOURCE_TIMEOUTS_MS = {
-  // 2026-05-10: 5000 was too tight — реальный отчёт показал timeout на cold-cache.
-  reddit: 7500,
+  // 2026-05-11: подняли reddit с 7500 — на занятых периодах он лучше
+  // отвечает за 10s, чем падает на 7.5.
+  reddit: 10000,
   unsplash: 6000, pexels: 6000, pixabay: 6000, flickr: 7000,
   artic: 7000, smithsonian: 7000, safebooru: 5000, openverse: 6000,
   wallhaven: 7000,
@@ -7132,9 +7142,15 @@ const SOURCE_TIMEOUTS_MS = {
   tumblr: 7000, deviantart: 8000, artstation: 7000,
   dribbble: 9000, 'dribbble-tags': 9000,
   wikiart: 7000, iarchive: 8000, nypl: 7000, opensea: 7000,
-  'awwwards-rss': 7000, siteinspire: 7000, fwa: 7000,
-  artvee: 9000, 'land-book': 18000,
-  pinterest: 18000, cosmos: 9000, readcv: 18000,
+  // 2026-05-11: feed-сорсы (designer-only) подняли с 7000 — они всегда
+  // отдают через 8-11s, при 7s падают в 95% случаев.
+  'awwwards-rss': 12000, siteinspire: 12000, fwa: 12000,
+  artvee: 9000, 'land-book': 12000,
+  pinterest: 18000,
+  // 2026-05-11: cosmos подняли 9000→20000 — headless ходит долго, но при
+  // успехе отдаёт ~24 картинки. Лучше подождать 4с лишних чем потерять.
+  cosmos: 20000,
+  readcv: 18000,
   'figma-community': 18000, mobbin: 18000, refero: 18000,
   met: 12000,
 };
@@ -8225,6 +8241,14 @@ function buildSearchContext(query, opts = {}) {
 }
 
 async function search(query, append = false, opts = {}) {
+  // Дедуп: если onPresetChange запланировал отложенный поиск (200ms
+  // debounce после смены раздела/уровня/фильтра), а в этот момент юзер
+  // кликнул тег и явно дёрнул search() — гасим pending-таймер чтобы
+  // он не сработал дублем с тем же query.
+  if (!append && typeof _onPresetChangeTimer !== 'undefined' && _onPresetChangeTimer) {
+    clearTimeout(_onPresetChangeTimer);
+    _onPresetChangeTimer = null;
+  }
   // Пустой запрос — НЕ дёргаем бэкенд (5 источников вернут «missing q»),
   // НЕ пишем в history. Просто очищаем стек и показываем idle empty-state.
   // Это срабатывает после mode-switch + клика по категории (см. п.4).
@@ -8291,32 +8315,48 @@ async function search(query, append = false, opts = {}) {
     });
     let { items, errors, skippedDueToCyrillic, skippedDueToHealth } = result;
 
-    // Smart Fallback v0: на initial-search с <K результатами и cyrillic/multi-word
-    // запросом — пробуем relax (drop последнее слово) и берём ещё одну порцию.
-    // Защита от зацикливания через state._fallbackUsed (сбрасывается на новом search).
+    // Smart Fallback v1: на initial-search с <K результатами — пробуем
+    // relax (drop последние 1-2 слова). До 2 попыток подряд:
+    //   попытка 1: убираем 1 слово (если ≥2 слов)
+    //   попытка 2: если всё ещё <K, убираем ещё одно (если ≥3 слов в q)
+    // Защита от зацикливания: state._fallbackUsed считает попытки.
     const FALLBACK_MIN = 10;
-    if (!append && !state._fallbackUsed && items.length < FALLBACK_MIN) {
+    state._fallbackUsed = 0;   // numeric counter, было boolean
+    const tryFallback = async (dropN) => {
       const words = String(query || '').trim().split(/\s+/).filter(Boolean);
-      // Релаксируем только если есть что выбросить — оставляем ≥1 слово.
-      if (words.length >= 2) {
-        state._fallbackUsed = true;
-        state.metrics.fallbackTriggered++;
-        const relaxed = words.slice(0, -1).join(' ');
-        try {
-          const more = await fetchAll(relaxed, () => {});
-          // Объединяем без дублей по canonical url + id.
-          const seenIds = new Set(items.map(i => i.id));
-          const seenCanons = new Set(items.map(i => i._canonUrl).filter(Boolean));
-          for (const it of (more.items || [])) {
-            if (seenIds.has(it.id)) continue;
-            if (it._canonUrl && seenCanons.has(it._canonUrl)) continue;
-            items.push(it);
-            seenIds.add(it.id);
-            if (it._canonUrl) seenCanons.add(it._canonUrl);
+      if (words.length < dropN + 1) return null;
+      const relaxed = words.slice(0, -dropN).join(' ');
+      try {
+        const more = await fetchAll(relaxed, () => {});
+        const seenIds = new Set(items.map(i => i.id));
+        const seenCanons = new Set(items.map(i => i._canonUrl).filter(Boolean));
+        let added = 0;
+        for (const it of (more.items || [])) {
+          if (seenIds.has(it.id)) continue;
+          if (it._canonUrl && seenCanons.has(it._canonUrl)) continue;
+          items.push(it);
+          seenIds.add(it.id);
+          if (it._canonUrl) seenCanons.add(it._canonUrl);
+          added++;
+        }
+        return { dropped: words.slice(-dropN).join(' '), relaxed, added };
+      } catch (e) { return null; }
+    };
+    if (!append && items.length < FALLBACK_MIN) {
+      state._fallbackUsed = 1;
+      state.metrics.fallbackTriggered++;
+      const info1 = await tryFallback(1);
+      if (info1) state._fallbackInfo = info1;
+      // Вторая попытка — если первая не дотянула.
+      if (items.length < FALLBACK_MIN) {
+        const info2 = await tryFallback(2);
+        if (info2) {
+          state._fallbackUsed = 2;
+          // Если второй пас был успешнее — обновляем info для toast'а.
+          if (!info1 || (info2.added || 0) > (info1.added || 0)) {
+            state._fallbackInfo = info2;
           }
-          // Сохраняем info для empty-state UX и для toast-уведомления.
-          state._fallbackInfo = { dropped: words[words.length - 1], relaxed };
-        } catch (e) { /* fallback дал ошибку — просто игнорим */ }
+        }
       }
     }
 
@@ -12319,15 +12359,17 @@ function exportHistoryJson() {
   }
 
   // --- per-source diag snapshot ---
+  // NB: используем `??` вместо `||` чтобы числовой 0 не превращался в null
+  // (раньше `info.items || null` врал что items=null, хотя на самом деле 0).
   const diag = {};
   for (const [sid, info] of Object.entries(state.diag || {})) {
     diag[sid] = {
       status: info.status || 'unknown',
       lastTested: info.lastTested ? new Date(info.lastTested).toISOString() : null,
-      ms: info.ms || null,
-      items: info.items || null,
-      statusCode: info.statusCode || null,
-      error: info.error || null,
+      ms: info.ms ?? null,
+      items: info.items ?? null,
+      statusCode: info.statusCode ?? null,
+      error: info.error ?? null,
     };
   }
 
