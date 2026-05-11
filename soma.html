@@ -11359,14 +11359,13 @@ function loadBackendInfo() {
   return fetch(`${BACKEND_URL}/api/info`).then(r => r.json()).then(info => {
     diagBackendInfo = info;
     // Capability: bell-режим доступен только держателям BELL_KEY.
-    const wasAvailable = state.bellAvailable;
     state.bellAvailable = !!(info && info.capabilities && info.capabilities.bell);
-    // Если capability только что появилась — даём фронту обновить
-    // mode-toggle и settings (например, юзер только что ввёл новый ключ).
-    if (state.bellAvailable !== wasAvailable) {
-      if (typeof renderModeToggle === 'function') renderModeToggle();
-      if (typeof renderBellToggle === 'function') renderBellToggle();
-    }
+    // Всегда (а не только при изменении) обновляем mode-toggle и
+    // settings-секцию. Иначе при логине новым ключом без bell-capability
+    // visibility флаги в DOM могли остаться от прошлой сессии (SW кешит
+    // или иной race). renderModeToggle идемпотентен и дешёв.
+    if (typeof renderModeToggle === 'function') renderModeToggle();
+    if (typeof renderBellToggle === 'function') renderBellToggle();
     if (document.getElementById('diag-modal').classList.contains('show')) renderDiag();
   }).catch(() => {});
 }
@@ -12774,6 +12773,12 @@ function setupBellToggle() {
   try {
     state.bellEnabled = localStorage.getItem('rs:bellEnabled') === '1';
   } catch (e) {}
+  // Проактивно ставим actual hidden-флаг на bell-opt по текущему стейту,
+  // даже до того как loadBackendInfo вернётся. На этом этапе
+  // bellAvailable=false по умолчанию — значит bell скроется. Если потом
+  // /api/info подтвердит capability, renderModeToggle вызовется снова
+  // (см. loadBackendInfo).
+  renderModeToggle();
 }
 
 function setupModeToggle() {
