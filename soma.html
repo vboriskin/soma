@@ -12891,26 +12891,49 @@ function setupModeToggle() {
   }
 }
 
-// Inject hidden " dribbble" modifier for select sources in designer mode
+// Источники, которые при artist+beginner выигрывают от хинта
+// "drawing reference" (соцсети/арт-платформы/фото-стоки/reddit). Музеи
+// и архивы НЕ включаем — они индексируют по периодам/художникам, и
+// слово "reference" режет полезную выдачу. Cosmos/Are.na в whitelist
+// тоже, там reference-доски популярны.
+const ARTIST_BEGINNER_HINT_SOURCES = new Set([
+  'reddit', 'pinterest', 'tumblr', 'tumblr-curated',
+  'deviantart', 'artstation',
+  'unsplash', 'pexels', 'pixabay', 'flickr',
+  'arena', 'arena-tags', 'cosmos',
+]);
+
+// Inject mode-specific modifiers into the query passed to a source.
+// Сейчас обрабатываем два режима:
+//   designer  — platform / domain / dribbble hint (см. фильтр-row).
+//   artist (beginner) — append "drawing reference" на noisy-источниках,
+//                       если запрос ещё не содержит drawing/reference/ref.
 function effectiveQueryFor(srcId, query) {
-  if (state.mode !== 'designer') return query;
-  // Фото-стоки, музеи, архивы и NFT — не индексируют слова `web`/`mobile`/
-  // `b2b`/`consumer`. Длинная фраза с ними даёт либо 0, либо случайный шум.
-  if (NO_DESIGNER_INJECTION_SOURCES.has(srcId)) return query;
   let q = query;
-  // Inject platform / domain modifiers chosen via filter-row.
-  const platform = state.designerPlatform;
-  if (platform && platform !== 'all' && !new RegExp(`\\b${platform}\\b`, 'i').test(q)) {
-    q = `${q} ${platform}`;
+
+  // Artist beginner level — мягкая подсказка "drawing reference".
+  if (state.mode === 'artist'
+      && state.artistLevel === 'beginner'
+      && ARTIST_BEGINNER_HINT_SOURCES.has(srcId)
+      && !/\b(drawing|reference|ref)\b/i.test(q)) {
+    q = `${q} drawing reference`;
   }
-  const domain = state.designerDomain;
-  if (domain && domain !== 'all' && !new RegExp(`\\b${domain}\\b`, 'i').test(q)) {
-    q = `${q} ${domain}`;
+
+  // Designer mode — platform/domain/dribbble injections.
+  if (state.mode === 'designer' && !NO_DESIGNER_INJECTION_SOURCES.has(srcId)) {
+    const platform = state.designerPlatform;
+    if (platform && platform !== 'all' && !new RegExp(`\\b${platform}\\b`, 'i').test(q)) {
+      q = `${q} ${platform}`;
+    }
+    const domain = state.designerDomain;
+    if (domain && domain !== 'all' && !new RegExp(`\\b${domain}\\b`, 'i').test(q)) {
+      q = `${q} ${domain}`;
+    }
+    if (DESIGNER_DRIBBBLE_HINT_SOURCES.has(srcId) && !/\bdribbble\b/i.test(q)) {
+      q = `${q} dribbble`;
+    }
   }
-  // Existing dribbble hint for select sources only.
-  if (DESIGNER_DRIBBBLE_HINT_SOURCES.has(srcId) && !/\bdribbble\b/i.test(q)) {
-    q = `${q} dribbble`;
-  }
+
   return q;
 }
 
